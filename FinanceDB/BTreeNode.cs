@@ -4,8 +4,8 @@ public sealed class BTreeNode
 {
     public long Id { get; }
     public bool IsLeaf { get; }
-    public IReadOnlyList<Record>? Records { get; }
-    public IReadOnlyList<BTreeNodeReference>? ChildrenRef { get; }
+    public List<Record>? Records { get; }
+    public List<BTreeNodeReference>? ChildrenRef { get; }
 
     public BTreeNode(long id, bool isLeaf, List<Record>? records, List<BTreeNodeReference>? childrenRef)
     {
@@ -74,7 +74,6 @@ public sealed class BTreeNode
         Record dummyRecord = new Record(recordKey, "", 0);
         int index = Records.BinarySearch(dummyRecord, ByKeyRecordComparer.Instance);
         return index;
-        Records.Where()
     }
     
     
@@ -152,6 +151,6 @@ public sealed class BTreeNode
     {
         int index = ChildrenRef.BinarySearch(oldRef);
         ChildrenRef.RemoveAt(index);
-
+        return null; //todo: change this
     }
 }
