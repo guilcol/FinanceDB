@@ -75,8 +75,6 @@ public sealed class BTreeNode
         int index = Records.BinarySearch(dummyRecord, ByKeyRecordComparer.Instance);
         return index;
     }
-    
-    
 
     public int FindChildReference(RecordKey key)
     {
@@ -149,8 +147,18 @@ public sealed class BTreeNode
 
     public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference leftRef, BTreeNodeReference rightRef)
     {
-        int index = ChildrenRef.BinarySearch(oldRef);
-        ChildrenRef.RemoveAt(index);
-        return null; //todo: change this
+        if (IsLeaf)
+            throw new InvalidOperationException($"Operation is only allowed on internal node. Node {Id} is not internal.");
+        
+        List<BTreeNodeReference> newChildrenRef = new List<BTreeNodeReference>(ChildrenRef);
+
+        int index = newChildrenRef.BinarySearch(oldRef);
+        
+        newChildrenRef.RemoveAt(index);
+        
+        newChildrenRef.Insert(index, leftRef);
+        newChildrenRef.Insert(index + 1, rightRef);
+        
+        return new BTreeNode(Id, false, null, newChildrenRef);
     }
 }
