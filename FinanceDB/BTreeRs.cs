@@ -7,11 +7,34 @@ namespace FinanceDB;
 
 public class BTreeRs : IRecordStorage
 {
+    private readonly Random rand;
+    public static int DEGREE = 20;
     private readonly Dictionary<long, BTreeNode> cache = new Dictionary<long, BTreeNode>();
+
+    public BTreeRs(Random rand)
+    {
+        this.rand = rand;
+    }
 
     public void Save()
     {
-        throw new NotImplementedException();
+        // Hold beginning size of cache
+        int cacheSize = cache.Count;
+        bool resetLoop = true;
+
+        while (resetLoop)
+        {
+            resetLoop = false;
+            foreach (var item in cache)
+            {
+                if (item.Value.isOverflowing()) // Check if current node is overflowing
+                {
+                    SplitNode(item.Value); // Split the overflowing node
+                    resetLoop = true;
+                    break;
+                }
+            }
+        }
     }
 
     public void Load()
@@ -82,7 +105,7 @@ public class BTreeRs : IRecordStorage
         BTreeNodeReference selectedChild;
 
         if (childIndex < 0) // If reference is not found, pick a neighboring reference
-            (selectedChild, childIndex) = node.SelectChildReference(~childIndex);
+            (selectedChild, childIndex) = node.SelectChildReference(~childIndex, rand);
         else
             selectedChild = node.ChildrenRef[childIndex];
 
@@ -213,21 +236,19 @@ public class BTreeRs : IRecordStorage
         for (int i = midPoint; i < node.Records.Count; i++)
             upperRecords.Add(node.Records[i]);
 
-        Random randLong = new Random();
-
         // Create random IDs for left and right nodes
-        long newLeftId = randLong.NextInt64(long.MaxValue);
-        long newRightId = randLong.NextInt64(long.MaxValue);
+        long newLeftId = rand.NextInt64(long.MaxValue);
+        long newRightId = rand.NextInt64(long.MaxValue);
 
         if (node.Id != 0)
             newLeftId = node.Id;
         else
             while (File.Exists(newLeftId.ToString())) // Verify left ID is unique
-                newLeftId = randLong.NextInt64(long.MaxValue);
+                newLeftId = rand.NextInt64(long.MaxValue);
 
         // Verify right ID is unique
         while (File.Exists(newRightId.ToString()))
-            newRightId = randLong.NextInt64(long.MaxValue);
+            newRightId = rand.NextInt64(long.MaxValue);
 
         // Create the new nodes.
         BTreeNode lowerHalf = new BTreeNode(newLeftId, true, lowerRecords, null);
@@ -280,17 +301,15 @@ public class BTreeRs : IRecordStorage
         for (int i = midPoint; i < node.ChildrenRef.Count; i++)
             upperChildrenReferences.Add(node.ChildrenRef[i]);
 
-        Random randLong = new Random();
-
         // Create random IDs for left and right nodes
-        long newLeftId = randLong.NextInt64(long.MaxValue);
-        long newRightId = randLong.NextInt64(long.MaxValue);
+        long newLeftId = rand.NextInt64(long.MaxValue);
+        long newRightId = rand.NextInt64(long.MaxValue);
 
         // Verify IDs are unique
         while (File.Exists(newLeftId.ToString())) // Verify left ID is unique
-            newLeftId = randLong.NextInt64(long.MaxValue);
+            newLeftId = rand.NextInt64(long.MaxValue);
         while (File.Exists(newRightId.ToString()))
-            newRightId = randLong.NextInt64(long.MaxValue);
+            newRightId = rand.NextInt64(long.MaxValue);
 
         // Create the new nodes.
         BTreeNode lowerHalf = new BTreeNode(newLeftId, false, null, lowerChildrenReferences);
@@ -328,15 +347,13 @@ public class BTreeRs : IRecordStorage
         for (int i = midPoint; i < node.Records.Count; i++)
             upperChildrenReferences.Add(node.ChildrenRef[i]);
 
-        Random randLong = new Random();
-
         // Create random IDs for left and right nodes
         long newLeftId = node.Id;
-        long newRightId = randLong.NextInt64(long.MaxValue);
+        long newRightId = rand.NextInt64(long.MaxValue);
 
         // Verify ID is unique
         while (File.Exists(newRightId.ToString()))
-            newRightId = randLong.NextInt64(long.MaxValue);
+            newRightId = rand.NextInt64(long.MaxValue);
 
         // Create the new nodes.
         BTreeNode lowerHalf = new BTreeNode(newLeftId, false, null, lowerChildrenReferences);
@@ -370,6 +387,8 @@ public class BTreeRs : IRecordStorage
 
     private void PutOnCache(BTreeNode node)
     {
+        if (cache.ContainsKey(node.Id))
+            cache.Remove(node.Id);
         cache.Add(node.Id, node);
     }
 
@@ -384,7 +403,7 @@ public class BTreeRs : IRecordStorage
     }
 
     private int GetIndexFromKey(RecordKey key, List<Record> list)
-    {
+    { 
         Record dummyRecord = new Record(key, "", 0);
         int index = list.BinarySearch(dummyRecord, ByKeyRecordComparer.Instance);
         return index;
@@ -415,9 +434,34 @@ public class BTreeRs : IRecordStorage
         throw new NotImplementedException();
     }
 
+    public bool ContainsKey(RecordKey key, BTreeNode node)
+    {
+        throw new NotImplementedException();
+    }
+
     public bool ContainsKey(RecordKey key)
     {
-        return false;
+        if (cache.Count == 0)
+            return false;
+        
+        return ContainsKeyInternal(key, ReadNode(0));
+    }
+
+    private bool ContainsKeyInternal(RecordKey key, BTreeNode node)
+    {
+        if (node.IsLeaf)
+            return ContainsKeyInRecords(key, node.Records);
+
+        int childRefIndex = node.FindChildReference(key);
+
+        if (childRefIndex < 0)
+            return false;
+
+        BTreeNodeReference childRef = node.ChildrenRef[childRefIndex];
+
+        BTreeNode childNode = ReadNode(childRef.ChildId);
+
+        return ContainsKeyInternal(key, childNode);
     }
 
     public bool ContainsKeyInRecords(RecordKey key, List<Record> list)
@@ -472,6 +516,11 @@ public class BTreeRs : IRecordStorage
         if (index > 0)
             return currentNodeRecords[index];
         return null;
+    }
+
+    public int CacheLength()
+    {
+        return cache.Count;
     }
 
     private BTreeNode ReadNode(long nodeId)

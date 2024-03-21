@@ -20,7 +20,7 @@ public interface IRecordStorage
 
     public int RecordCount();
 
-    public bool ContainsKey(RecordKey key);
+    public bool ContainsKey(RecordKey key, BTreeNode node);
 
     public Record? Read(RecordKey key);
 

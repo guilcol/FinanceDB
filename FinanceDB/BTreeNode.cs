@@ -15,9 +15,18 @@ public sealed class BTreeNode
         ChildrenRef = childrenRef;
     }
 
-    public bool isFull(int degree)
+    public bool isFull()
     {
-        return Records.Count < degree;
+        if (Records == null)
+            return ChildrenRef.Count < BTreeRs.DEGREE;
+        return Records.Count < BTreeRs.DEGREE; //TODO: Fix isFull() return true for any value under DEGREE
+    }
+
+    public bool isOverflowing()
+    {
+        if (Records == null)
+            return ChildrenRef.Count > BTreeRs.DEGREE;
+        return Records.Count > BTreeRs.DEGREE;
     }
 
     
@@ -110,14 +119,12 @@ public sealed class BTreeNode
         return -1;
     }
 
-    public (BTreeNodeReference, int) SelectChildReference(int index)
+    public (BTreeNodeReference, int) SelectChildReference(int index, Random rand)
     {
         if (index == 0)
             return (ChildrenRef[0], 0);
         if (index == ChildrenRef.Count)
             return (ChildrenRef[index - 1], index - 1);
-
-        Random rand = new Random();
 
         if (rand.Next(2) == 0)
             return (ChildrenRef[index], index);
