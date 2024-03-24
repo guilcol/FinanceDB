@@ -18,15 +18,15 @@ public sealed class BTreeNode
     public bool isFull()
     {
         if (Records == null)
-            return ChildrenRef.Count < BTreeRs.DEGREE;
-        return Records.Count < BTreeRs.DEGREE; //TODO: Fix isFull() return true for any value under DEGREE
+            return ChildrenRef.Count < BTreeRs.degree;
+        return Records.Count < BTreeRs.degree; //TODO: Fix isFull() return true for any value under DEGREE
     }
 
     public bool isOverflowing()
     {
         if (Records == null)
-            return ChildrenRef.Count > BTreeRs.DEGREE;
-        return Records.Count > BTreeRs.DEGREE;
+            return ChildrenRef.Count > BTreeRs.degree;
+        return Records.Count > BTreeRs.degree;
     }
 
     
@@ -167,5 +167,40 @@ public sealed class BTreeNode
         newChildrenRef.Insert(index + 1, rightRef);
         
         return new BTreeNode(Id, false, null, newChildrenRef);
+    }
+
+    public List<BTreeNodeReference> MatchingReferences(RecordKey key)
+    {
+        List<BTreeNodeReference> result = new List<BTreeNodeReference>();
+        
+        int index = FindChildReference(key);
+
+        if (index < 0)
+            index = ~index;
+            
+        result.Add(ChildrenRef[index]);
+        
+        // todo: don't depend on accountId
+        
+        for (int i = index + 1; i < ChildrenRef.Count; i++)
+        {
+            BTreeNodeReference childRef = ChildrenRef[i];
+            
+            if (childRef.FirstKey <= key && childRef.LastKey >= key)
+            {
+                result.Add(childRef);
+            } 
+            else if (childRef.FirstKey.AccountId == key.AccountId)
+            {
+                result.Add(childRef);
+            }
+            else
+            {
+                return result;
+            }
+        }
+
+        return result;
+        
     }
 }

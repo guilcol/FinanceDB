@@ -1,4 +1,5 @@
 ﻿using System.Data.Common;
+using System.Net;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text.Json.Nodes;
 using Newtonsoft.Json;
@@ -8,12 +9,13 @@ namespace FinanceDB;
 public class BTreeRs : IRecordStorage
 {
     private readonly Random rand;
-    public static int DEGREE = 20;
+    public static int degree;
     private readonly Dictionary<long, BTreeNode> cache = new Dictionary<long, BTreeNode>();
 
-    public BTreeRs(Random rand)
+    public BTreeRs(Random rand, int deg)
     {
         this.rand = rand;
+        degree = deg;
     }
 
     public void Save()
@@ -214,7 +216,7 @@ public class BTreeRs : IRecordStorage
             SplitInternalRoot(node);
             return;
         }
-        
+
         SplitInternalNonRoot(node);
 
     }
@@ -344,7 +346,7 @@ public class BTreeRs : IRecordStorage
             lowerChildrenReferences.Add(node.ChildrenRef[i]);
 
         // Transfer second half to upperChildrenReferences
-        for (int i = midPoint; i < node.Records.Count; i++)
+        for (int i = midPoint; i < node.ChildrenRef.Count; i++)
             upperChildrenReferences.Add(node.ChildrenRef[i]);
 
         // Create random IDs for left and right nodes
@@ -403,7 +405,7 @@ public class BTreeRs : IRecordStorage
     }
 
     private int GetIndexFromKey(RecordKey key, List<Record> list)
-    { 
+    {
         Record dummyRecord = new Record(key, "", 0);
         int index = list.BinarySearch(dummyRecord, ByKeyRecordComparer.Instance);
         return index;
@@ -419,10 +421,44 @@ public class BTreeRs : IRecordStorage
         throw new NotImplementedException();
     }
 
-    public IReadOnlyList<Record> List(string accountId)
+    public IReadOnlyList<Record>? List(string accountId)
     {
-        throw new NotImplementedException();
+        RecordKey dummyKey = new RecordKey(accountId, DateTime.MinValue, 0);
+        
+        //RecordKey minKey = new RecordKey(accountId, DateTime.MinValue, 0);
+        //RecordKey maxKey = new RecordKey(accountId, DateTime.MaxValue, max);
+
+        return GetListFromId(dummyKey, ReadNode(0), new List<Record>());
     }
+
+    private List<Record> GetListFromId(RecordKey key, BTreeNode node, List<Record> list)
+    {
+        List<Record> result = list;
+        
+        if (node.IsLeaf)
+        {
+            foreach (Record record in node.Records)
+                if (record.Key.AccountId == key.AccountId)
+                    result.Add(record); // todo: binary search first record
+        }
+        else
+        {
+            List<BTreeNodeReference> viableReferences = node.MatchingReferences(key);
+
+            if (viableReferences == null)
+                return result;
+            
+            foreach (BTreeNodeReference reference in viableReferences)
+            {
+                BTreeNode childNode = ReadNode(reference.ChildId);
+                result = GetListFromId(key, childNode, result);
+
+            }
+        }
+
+        return result;
+    }
+    
 
     public decimal GetBalance(string accountId)
     {
@@ -446,6 +482,7 @@ public class BTreeRs : IRecordStorage
         
         return ContainsKeyInternal(key, ReadNode(0));
     }
+    
 
     private bool ContainsKeyInternal(RecordKey key, BTreeNode node)
     {
@@ -542,4 +579,5 @@ public class BTreeRs : IRecordStorage
     {
         throw new NotImplementedException();
     }
+    
 }
