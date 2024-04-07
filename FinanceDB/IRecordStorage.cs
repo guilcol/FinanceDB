@@ -16,7 +16,7 @@ public interface IRecordStorage
 
     public IReadOnlyList<Record>? List(string accountId);
 
-    public decimal GetBalance(string accountId);
+    public decimal GetBalance(string accountId, RecordKey key);
 
     public int RecordCount();
 

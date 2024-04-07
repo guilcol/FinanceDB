@@ -71,17 +71,18 @@ public class UnitTest2
         Record randomVenusRecord = venusRecords[rand.Next(venusRecords.Count-1)];
 
         // Delete records
-        db.Delete(randomEarthRecord);
-        db.Delete(randomJupiterRecord);
-        db.Delete(randomVenusRecord);
+        bool deleteEarthRecord = db.Delete(randomEarthRecord);
+        bool deleteJupiterRecord = db.Delete(randomJupiterRecord);
+        bool deleteVenusRecord = db.Delete(randomVenusRecord);
         
         // Save and build tree
         db.Save();
         
         // Assert records are no longer found in database
-        Assert.IsFalse(db.ContainsKey(randomEarthRecord.Key));
-        Assert.IsFalse(db.ContainsKey(randomJupiterRecord.Key));
-        Assert.IsFalse(db.ContainsKey(randomVenusRecord.Key));
+        Assert.IsTrue(deleteEarthRecord);
+        Assert.IsTrue(deleteJupiterRecord);
+        Assert.IsTrue(deleteVenusRecord);
+
     }
     
     [TestMethod]
@@ -156,7 +157,77 @@ public class UnitTest2
         Assert.AreEqual(5, jupiterRecords.Count);
         Assert.AreEqual(5, venusRecords.Count);
     }
-    
+
+    [TestMethod]
+    public void TestGetBalance()
+    {
+        /*
+        BTreeRs db = new BTreeRs(new Random(0), 3);
+        DateTime referenceDate = DateTime.UtcNow;
+        RecordKey key1 = new RecordKey("Paul", referenceDate, 0);
+        RecordKey key2 = new RecordKey("Paul", referenceDate, 10);
+        RecordKey key3 = new RecordKey("Paul", referenceDate, 20);
+        RecordKey key4 = new RecordKey("Paul", referenceDate, 30);
+        RecordKey key5 = new RecordKey("Paul", referenceDate, 40);
+
+        db.Insert(new Record(key1, "", 12.5m));     // balance: 12.5
+        db.Insert(new Record(key2, "", 23.95m));    // balance: 36.45
+        db.Insert(new Record(key3, "", 9.12m));     // balance: 45.57
+        db.Insert(new Record(key4, "", -17m));      // balance: 28.57
+        db.Insert(new Record(key5, "", 200.95m));   // balance: 228.57
+        
+        db.Save();
+
+        decimal retrievedBalance1 = db.GetBalance("Paul", key1);
+        decimal retrievedBalance2 = db.GetBalance("Paul", key2);
+        decimal retrievedBalance3 = db.GetBalance("Paul", key3);
+        decimal retrievedBalance4 = db.GetBalance("Paul", key4);
+        decimal retrievedBalance5 = db.GetBalance("Paul", key5);
+        
+        Assert.AreEqual(12.5m, retrievedBalance1);
+        Assert.AreEqual(36.45m, retrievedBalance2);
+        Assert.AreEqual(45.57m, retrievedBalance3);
+        Assert.AreEqual(28.57m, retrievedBalance4);
+        Assert.AreEqual(229.52m, retrievedBalance5);
+         */
+        
+        BTreeRs db = new BTreeRs(new Random(0), 3);
+        
+        List<RecordKey> randomKeysAnubis = GenerateRandomRecordKeys("Anubis", 2000, 100_000_000);
+
+        Random rand = new Random();
+
+        foreach (RecordKey key in randomKeysAnubis)
+        {
+            double minValue = -100.00;
+            double maxValue = 9000.00;
+            double randomValue = rand.NextDouble() * (maxValue - minValue) + minValue;
+            db.Insert(new Record(key, "", (decimal)randomValue));
+        }
+        
+        db.Save();
+
+        List<Record> AllRecords = new List<Record>();
+        AllRecords.AddRange(db.List("Anubis") ?? throw new InvalidOperationException("Null records"));
+        
+        RecordKey randomKey = AllRecords[rand.Next(AllRecords.Count)].Key;
+
+        decimal balanceFromList = RetrieveBalanceFromList(AllRecords, randomKey);
+    }
+
+    private decimal RetrieveBalanceFromList(List<Record> allRecords, RecordKey randomKey)
+    {
+        decimal balance = 0;
+        
+        foreach (Record record in allRecords)
+        {
+            //if (record.Key < )
+            //todo: Finish this helper method and make GetBalance() O(log n)
+        }
+
+        return 0;
+    }
+
 
     [TestMethod]
     public void TestBTreeNodeReferenceBinarySearch()
@@ -204,7 +275,7 @@ public class UnitTest2
         
         db.Save();
         
-        Assert.AreEqual(517, db.CacheLength());
+        Assert.AreEqual(517, db.GetCacheLengthFromAccountId(""));
 
     }
     

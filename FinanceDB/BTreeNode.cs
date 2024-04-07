@@ -1,13 +1,15 @@
-﻿namespace FinanceDB;
+﻿using System.Runtime.InteropServices.JavaScript;
+
+namespace FinanceDB;
 
 public sealed class BTreeNode
 {
     public long Id { get; }
     public bool IsLeaf { get; }
-    public List<Record>? Records { get; }
+    public Record[]? Records { get; }
     public List<BTreeNodeReference>? ChildrenRef { get; }
 
-    public BTreeNode(long id, bool isLeaf, List<Record>? records, List<BTreeNodeReference>? childrenRef)
+    public BTreeNode(long id, bool isLeaf, Record[]? records, List<BTreeNodeReference>? childrenRef)
     {
         Id = id;
         IsLeaf = isLeaf;
@@ -19,49 +21,48 @@ public sealed class BTreeNode
     {
         if (Records == null)
             return ChildrenRef.Count < BTreeRs.degree;
-        return Records.Count < BTreeRs.degree; //TODO: Fix isFull() return true for any value under DEGREE
+        return Records.Length < BTreeRs.degree; //TODO: Fix isFull() return true for any value under DEGREE
     }
 
     public bool isOverflowing()
     {
         if (Records == null)
             return ChildrenRef.Count > BTreeRs.degree;
-        return Records.Count > BTreeRs.degree;
+        return Records.Length > BTreeRs.degree;
     }
 
-    
+
     public BTreeNode WithNewRecord(int index, Record record)
     {
-        
         if (!IsLeaf)
             throw new InvalidOperationException($"Operation is only allowed on leaf node. Node {Id} is not a leaf.");
 
-        List<Record> records = new List<Record>(Records);
-
-        records.Insert(index, record);
+        Record[] records = new Record[Records.Length + 1];
+        Array.Copy(Records, 0, records, 0, index);
+        records[index] = record;
+        Array.Copy(Records, index, records, index + 1, Records.Length - index);
 
         return new BTreeNode(Id, true, records, null);
     }
-    
+
     public BTreeNode WithDeletedRecord(int index, Record record)
     {
         if (!IsLeaf)
             throw new InvalidOperationException($"Operation is only allowed on leaf node. Node {Id} is not a leaf.");
 
-        List<Record> records = new List<Record>(Records);
-
-        records.RemoveAt(index);
+        Record[] records = new Record[Records.Length - 1];
+        Array.Copy(Records, 0, records, 0, index);
+        Array.Copy(Records, index + 1, records, index, Records.Length - (index + 1));
 
         return new BTreeNode(Id, true, records, null);
     }
-    
+
     public BTreeNode WithUpdatedRecord(int index, Record record)
     {
         if (!IsLeaf)
             throw new InvalidOperationException($"Operation is only allowed on leaf node. Node {Id} is not a leaf.");
 
-        List<Record> records = new List<Record>(Records);
-
+        Record[] records = (Record[])Records.Clone();
         records[index] = record;
 
         return new BTreeNode(Id, true, records, null);
@@ -77,11 +78,11 @@ public sealed class BTreeNode
 
         return new BTreeNode(Id, false, null, childrenRef);
     }
-    
+
     public int GetIndexFromKey(RecordKey recordKey)
     {
         Record dummyRecord = new Record(recordKey, "", 0);
-        int index = Records.BinarySearch(dummyRecord, ByKeyRecordComparer.Instance);
+        int index = Array.BinarySearch((Record[])Records, dummyRecord, ByKeyRecordComparer.Instance);
         return index;
     }
 
@@ -141,55 +142,55 @@ public sealed class BTreeNode
             throw new Exception("What the fuck?");
 
         return ChildrenRef[index];
-
-
     }
 
     public BTreeNodeReference GetSelfReference()
     {
         if (IsLeaf)
-            return new BTreeNodeReference(Records[0].Key, Records[Records.Count - 1].Key, Id);
+            return new BTreeNodeReference(Records[0].Key, Records[Records.Length - 1].Key, Id);
         return new BTreeNodeReference(ChildrenRef[0].FirstKey, ChildrenRef[ChildrenRef.Count - 1].LastKey, Id);
     }
 
-    public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference leftRef, BTreeNodeReference rightRef)
+    public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference leftRef,
+        BTreeNodeReference rightRef)
     {
         if (IsLeaf)
-            throw new InvalidOperationException($"Operation is only allowed on internal node. Node {Id} is not internal.");
-        
+            throw new InvalidOperationException(
+                $"Operation is only allowed on internal node. Node {Id} is not internal.");
+
         List<BTreeNodeReference> newChildrenRef = new List<BTreeNodeReference>(ChildrenRef);
 
         int index = newChildrenRef.BinarySearch(oldRef);
-        
+
         newChildrenRef.RemoveAt(index);
-        
+
         newChildrenRef.Insert(index, leftRef);
         newChildrenRef.Insert(index + 1, rightRef);
-        
+
         return new BTreeNode(Id, false, null, newChildrenRef);
     }
 
     public List<BTreeNodeReference> MatchingReferences(RecordKey key)
     {
         List<BTreeNodeReference> result = new List<BTreeNodeReference>();
-        
+
         int index = FindChildReference(key);
 
         if (index < 0)
             index = ~index;
-            
+
         result.Add(ChildrenRef[index]);
-        
+
         // todo: don't depend on accountId
-        
+
         for (int i = index + 1; i < ChildrenRef.Count; i++)
         {
             BTreeNodeReference childRef = ChildrenRef[i];
-            
+
             if (childRef.FirstKey <= key && childRef.LastKey >= key)
             {
                 result.Add(childRef);
-            } 
+            }
             else if (childRef.FirstKey.AccountId == key.AccountId)
             {
                 result.Add(childRef);
@@ -201,6 +202,5 @@ public sealed class BTreeNode
         }
 
         return result;
-        
     }
 }

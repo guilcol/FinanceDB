@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace FinanceDB;
 
-public class Record
+public class Record 
 {
     public RecordKey Key;
     private string _description;
