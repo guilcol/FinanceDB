@@ -9,7 +9,7 @@ public class UnitTest1
     public void TestInitialBalanceIsZero()
     {
         var db = CreateRecordStorage();
-        Assert.AreEqual((decimal)0, db.GetBalance(""), "Invalid balance");
+        Assert.AreEqual((decimal)0, db.GetBalance("", new RecordKey("", DateTime.UtcNow, 0)), "Invalid balance");
 
     }
     
@@ -26,13 +26,13 @@ public class UnitTest1
         var record2 = new Record(key2, "test", (decimal)678.90);
         db.Insert(record2);
 
-        Assert.AreEqual((decimal)(123.45 + 678.90), db.GetBalance(""), "Invalid balance");
+        Assert.AreEqual((decimal)(123.45 + 678.90), db.GetBalance("", new RecordKey("", DateTime.UtcNow, 0)), "Invalid balance");
 
         var key3 = new RecordKey("", DateTime.UtcNow, 3);
         var record3 = new Record(key3, "test", (decimal)12.0);
         db.Insert(record3);
 
-        Assert.AreEqual((decimal)(123.45 + 678.90 + 12.0), db.GetBalance(""), "Invalid balance");
+        Assert.AreEqual((decimal)(123.45 + 678.90 + 12.0), db.GetBalance("", new RecordKey("", DateTime.UtcNow, 0)), "Invalid balance");
         
         var insert = db.Insert(record3);
         Assert.IsFalse(insert, "Insert does not catch duplicates");

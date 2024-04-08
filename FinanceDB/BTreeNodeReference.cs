@@ -5,12 +5,14 @@ public class BTreeNodeReference : IComparable<BTreeNodeReference>, IEquatable<BT
     public readonly  RecordKey FirstKey;
     public readonly  RecordKey LastKey;
     public readonly long ChildId;
+    public decimal Amount;
 
-    public BTreeNodeReference(RecordKey firstKey, RecordKey lastKey, long childId)
+    public BTreeNodeReference(RecordKey firstKey, RecordKey lastKey, long childId, Decimal amount)
     {
         FirstKey = firstKey;
         LastKey = lastKey;
         ChildId = childId;
+        Amount = amount;
     }
     
     public static bool operator ==(BTreeNodeReference? x, BTreeNodeReference? y)
@@ -60,5 +62,10 @@ public class BTreeNodeReference : IComparable<BTreeNodeReference>, IEquatable<BT
                 return false;
             return (FirstKey == other.FirstKey && LastKey == other.LastKey && ChildId == other.ChildId);
         }
+    }
+
+    public decimal GetAmount()
+    {
+        return Amount;
     }
 }

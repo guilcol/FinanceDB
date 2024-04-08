@@ -84,6 +84,11 @@ public class BasicRs : IRecordStorage
         return result;
     }
 
+    public decimal GetBalance(string accountId, RecordKey key)
+    {
+        throw new NotImplementedException();
+    }
+
     public decimal GetBalance(string accountId)
     {
         decimal result = 0;
