@@ -91,6 +91,7 @@ public sealed class BTreeNode
     public int FindChildReference(RecordKey key)
     {
         int left = 0;
+
         int right = ChildrenRef.Count - 1;
 
         while (left <= right)
@@ -138,6 +139,10 @@ public sealed class BTreeNode
     {
         RecordKey dummyKey = targetRef.FirstKey;
 
+        if (ChildrenRef == null)
+        {
+            throw new Exception("For some reason, you managed to call this in a leaf node.");
+        }
         int index = FindChildReference(dummyKey);
 
         if (index < 0)
@@ -170,6 +175,38 @@ public sealed class BTreeNode
 
         return new BTreeNode(Id, false, null, newChildrenRef, Amount);
     }
+
+    public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference[] newRefs)
+    {
+        if (IsLeaf)
+            throw new InvalidOperationException(
+                $"Operation is only allowed on internal node. Node {Id} is not internal.");
+
+        // Convert the list of children references to a list to make modifications easier
+        List<BTreeNodeReference> newChildrenRef = new List<BTreeNodeReference>(ChildrenRef);
+
+        // Find the index of oldRef in the list of children
+        int index = newChildrenRef.BinarySearch(oldRef, Comparer<BTreeNodeReference>.Default);
+
+        if (index < 0)
+        {
+            throw new ArgumentException("Reference not found in children", nameof(oldRef));
+        }
+
+        // Remove the old reference
+        newChildrenRef.RemoveAt(index);
+
+        // Insert the new references starting from the found index
+        // We go in reverse order for Insert to keep the original order of newRefs
+        for (int i = newRefs.Length - 1; i >= 0; i--)
+        {
+            newChildrenRef.Insert(index, newRefs[i]);
+        }
+
+        // Create a new BTreeNode with the updated list of children references
+        return new BTreeNode(Id, false, null, newChildrenRef, Amount);
+    }
+
 
     public List<BTreeNodeReference> MatchingReferences(RecordKey key)
     {

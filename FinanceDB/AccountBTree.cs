@@ -49,7 +49,7 @@ public class AccountBTree
         var root = ReadNode(0);
         if (root == null)
         {
-            root = new BTreeNode(0, true, new [] {record}, null, record.GetAmount());
+            root = new BTreeNode(0, true, new[] { record }, null, record.GetAmount());
             PutOnCache(root);
             return true;
         }
@@ -216,93 +216,75 @@ public class AccountBTree
         }
 
         SplitInternalNonRoot(node);
-
     }
 
-    public void SplitLeafNode(BTreeNode node)
+    private void SplitLeafNode(BTreeNode node)
     {
         // Obtain length of records
         int totalLength = node.Records.Length;
         
-        // Find midpoint of Records
-        int midPoint = totalLength / 2;
-        
-        // Adjust midpoint in case original length is odd
-        if (totalLength % 2 != 0)
-            midPoint++;             
+        // Calculate the number of segments needed
+        int numSegments = totalLength / Degree;
 
-        // Initialize Record lists for the new nodes
-        Record[] lowerRecords = new Record[midPoint];
-        Record[] upperRecords = new Record[totalLength - midPoint];
+        int capacity = numSegments * Degree;
+        if (capacity < totalLength)
+            ++numSegments;
 
-        // Variables to store the balance
-        Decimal lowerBalance = 0;
-        Decimal upperBalance = 0;
+        int correctLength = totalLength / numSegments;
 
-        // Transfer first half to lowerRecords
-        for (int i = 0; i < midPoint; i++)
+        // Initialize arrays of new BTreeNodes
+        BTreeNode[] newNodes = new BTreeNode[numSegments];
+        BTreeNodeReference[] newReferences = new BTreeNodeReference[numSegments];
+
+        // Loop through all records and split them into chunks of correctLength
+        for (int start = 0, segmentIndex = 0; segmentIndex < numSegments; start += correctLength, segmentIndex++)
         {
-            Record currentRecord = node.Records[i];
-            lowerRecords[i] = currentRecord;
-            lowerBalance += currentRecord.GetAmount();
+            int segmentLength;
+            
+            // Calculate segment length for this iteration
+            if (segmentIndex == numSegments - 1)
+                segmentLength = totalLength - start;
+            else
+                segmentLength = correctLength;
+            
+            long newId;
+            
+            if (segmentIndex == 0 && node.Id != 0)
+            {
+                // Repurpose ID from this node
+                newId = node.Id;
+            }
+            else
+            {
+                // Create new ID todo: Make sure ID is unique
+                newId = _rand.NextInt64(long.MaxValue);
+            }
+
+            // Copy records into the new segment
+            Record[] segment = new Record[segmentLength];
+            Array.Copy(node.Records, start, segment, 0, segmentLength);
+
+            // Calculate balance for the segment
+            decimal segmentBalance = segment.Sum(record => record.GetAmount());
+
+            // Store new node
+            newNodes[segmentIndex] = new BTreeNode(newId, true, segment, null, segmentBalance);
+            newReferences[segmentIndex] = newNodes[segmentIndex].GetSelfReference();
+            PutOnCache(newNodes[segmentIndex]);
         }
-        
-        // Transfer second half to upperRecords
-        for (int i = midPoint; i < totalLength; i++)
-        {
-            Record currentRecord = node.Records[i];
-            upperRecords[i - midPoint] = currentRecord;
-            upperBalance += currentRecord.GetAmount();
-
-        }
-
-        // Create random IDs for left and right nodes
-        long newLeftId = _rand.NextInt64(long.MaxValue);
-        long newRightId = _rand.NextInt64(long.MaxValue);
-
-        if (node.Id != 0)
-            newLeftId = node.Id;
-        else
-            while (File.Exists(newLeftId.ToString())) // Verify left ID is unique
-                newLeftId = _rand.NextInt64(long.MaxValue);
-
-        // Verify right ID is unique
-        while (File.Exists(newRightId.ToString()))
-            newRightId = _rand.NextInt64(long.MaxValue);
-
-        // Create the new nodes.
-        BTreeNode lowerHalf = new BTreeNode(newLeftId, true, lowerRecords, null, lowerBalance);
-        BTreeNode upperHalf = new BTreeNode(newRightId, true, upperRecords, null, upperBalance);
-
-        // Create the references to be placed on the parent node
-        BTreeNodeReference lowerReference = lowerHalf.GetSelfReference();
-        BTreeNodeReference upperReference = upperHalf.GetSelfReference();
 
         if (node.Id == 0)
         {
-            List<BTreeNodeReference> childrenRef = new List<BTreeNodeReference>();
-
-            childrenRef.Add(lowerReference);
-            childrenRef.Add(upperReference);
-
-            BTreeNode newRoot = new BTreeNode(0, false, null, childrenRef, lowerBalance + upperBalance);
-
+            BTreeNode newRoot = new BTreeNode(0, false, null, newReferences.ToList(), node.GetAmount());
             PutOnCache(newRoot);
-            PutOnCache(lowerHalf);
-            PutOnCache(upperHalf);
-
             return;
         }
 
         BTreeNode parentNode = FindParentNode(_cache[0], node.GetSelfReference());
-
-        BTreeNode newParentNode = parentNode.WithSplitReference(node.GetSelfReference(), lowerReference, upperReference);
-
+        BTreeNode newParentNode = parentNode.WithSplitReference(node.GetSelfReference(), newReferences);
         PutOnCache(newParentNode);
-        PutOnCache(lowerHalf);
-        PutOnCache(upperHalf);
     }
-
+    
     public void SplitInternalRoot(BTreeNode node)
     {
         // Find midpoint of Children References
@@ -311,11 +293,11 @@ public class AccountBTree
         // Initialize BTreeNodeReference lists for the new nodes
         List<BTreeNodeReference> lowerChildrenReferences = new List<BTreeNodeReference>();
         List<BTreeNodeReference> upperChildrenReferences = new List<BTreeNodeReference>();
-        
+
         // Variables to store the balance
         Decimal lowerBalance = 0;
         Decimal upperBalance = 0;
-        
+
         // Transfer first half to lowerChildrenReferences
         for (int i = 0; i < midPoint; i++)
         {
@@ -373,7 +355,7 @@ public class AccountBTree
         // Variables to store the balance
         Decimal lowerBalance = 0;
         Decimal upperBalance = 0;
-        
+
         // Transfer first half to lowerChildrenReferences
         for (int i = 0; i < midPoint; i++)
         {
@@ -464,87 +446,56 @@ public class AccountBTree
         }
 
         return result;
-
-        /*
-
-        List<Record> result = list;
-
-        if (node.IsLeaf)
-        {
-            Record dummyRecord = new Record(key, "", 0);
-            int index = Array.BinarySearch(node.Records, 0, node.Records.Length, dummyRecord, ByKeyRecordComparer.Instance);
-
-            if (index < 0)
-                index = ~index;
-
-            for (int i = index; i < node.Records.Length; i++)
-            {
-                Record currentRecord = node.Records[i];
-                if (currentRecord.Key.AccountId == key.AccountId)
-                    result.Add(currentRecord);
-                else
-                    break;
-            }
-        }
-        else
-        {
-            List<BTreeNodeReference> viableReferences = node.MatchingReferences(key);
-
-            if (viableReferences == null)
-                return result;
-
-            foreach (BTreeNodeReference reference in viableReferences)
-            {
-                BTreeNode childNode = ReadNode(reference.ChildId);
-                result = CollectRecordsByAccountId(key, childNode, result);
-
-            }
-        }
-
-        return result;
-         */
     }
-
 
     public decimal GetBalance()
     {
         return ReadNode(0).GetAmount();
     }
+
     public decimal GetBalance(RecordKey key)
     {
         return CollectBalanceByAccountId(key, ReadNode(0), 0);
     }
-    
+
 
     public decimal CollectBalanceByAccountId(RecordKey key, BTreeNode node, decimal balance)
     {
+        // Variable to store resulting balance
         decimal result = balance;
 
         if (node.IsLeaf)
         {
+            // In case we reach a leaf, iterate through all records and add their balance to result
             for (int i = 0; i < node.Records.Length; i++)
             {
                 Record currentRecord = node.Records[i];
-                if (currentRecord.Key > key)
+                if (currentRecord.Key > key) // If current record is greater than key, we can stop reading them
                     return result;
                 result += currentRecord.GetAmount();
             }
         }
-        else
+        else // In case current node is internal
         {
+            // Iterate all references 
             foreach (BTreeNodeReference childRef in node.ChildrenRef)
             {
+                // Compare target key with each reference's last key
                 if (key > childRef.LastKey)
                 {
+                    // Add reference's amount to result since key larger than any key inside this reference
                     result += childRef.GetAmount();
                 }
                 else
                 {
+                    // In case key is not larger than reference's last key, it must be inside this reference
+                    // So we read the reference's child node and recursively call this method with the child node
                     BTreeNode childNode = ReadNode(childRef.ChildId);
                     return CollectBalanceByAccountId(key, childNode, result);
                 }
             }
         }
+
         return result;
     }
 
@@ -560,10 +511,9 @@ public class AccountBTree
 
     public bool ContainsKey(RecordKey key)
     {
-        
         if (_cache.Count == 0)
             return false;
-        
+
         return ContainsKeyInternal(key, ReadNode(0));
     }
 
@@ -662,5 +612,4 @@ public class AccountBTree
     {
         throw new NotImplementedException();
     }
-    
 }
