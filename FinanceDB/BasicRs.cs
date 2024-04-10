@@ -51,7 +51,7 @@ public class BasicRs : IRecordStorage
 
     public bool Delete(Record record)
     {
-        return Delete(record.Key);
+        return Delete(record.Key); // Is it necessary to have Delete(Record) and a Delete(Record.Key) ?
     }
 
     public bool Delete(RecordKey key)
@@ -84,8 +84,9 @@ public class BasicRs : IRecordStorage
         return result;
     }
 
-    public decimal GetBalance(string accountId)
+    public decimal GetBalance(string accountId, RecordKey key)
     {
+        // Date not implemented
         decimal result = 0;
         foreach (Record record in List(accountId)) 
             result += record.GetAmount();
@@ -95,6 +96,11 @@ public class BasicRs : IRecordStorage
     public int RecordCount()
     {
         return database.Count;
+    }
+
+    public bool ContainsKey(RecordKey key, BTreeNode node)
+    {
+        throw new NotImplementedException();
     }
 
     public bool ContainsKey(RecordKey key)
@@ -150,5 +156,10 @@ public class BasicRs : IRecordStorage
 
         // If there is no collision of records, return the original key
         return key;
+    }
+
+    IReadOnlyList<Record>? IRecordStorage.List(string id)
+    {
+        throw new NotImplementedException();
     }
 }
