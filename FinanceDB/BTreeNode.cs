@@ -8,13 +8,16 @@ public sealed class BTreeNode
     public bool IsLeaf { get; }
     public Record[]? Records { get; }
     public List<BTreeNodeReference>? ChildrenRef { get; }
+    
+    public decimal Amount;
 
-    public BTreeNode(long id, bool isLeaf, Record[]? records, List<BTreeNodeReference>? childrenRef)
+    public BTreeNode(long id, bool isLeaf, Record[]? records, List<BTreeNodeReference>? childrenRef, decimal amount)
     {
         Id = id;
         IsLeaf = isLeaf;
         Records = records;
         ChildrenRef = childrenRef;
+        Amount = amount;
     }
 
     public bool isFull()
@@ -23,7 +26,6 @@ public sealed class BTreeNode
             return ChildrenRef.Count < BTreeRs.degree;
         return Records.Length < BTreeRs.degree; //TODO: Fix isFull() return true for any value under DEGREE
     }
-
     public bool isOverflowing()
     {
         if (Records == null)
@@ -42,7 +44,7 @@ public sealed class BTreeNode
         records[index] = record;
         Array.Copy(Records, index, records, index + 1, Records.Length - index);
 
-        return new BTreeNode(Id, true, records, null);
+        return new BTreeNode(Id, true, records, null, Amount + record.GetAmount());
     }
 
     public BTreeNode WithDeletedRecord(int index, Record record)
@@ -54,7 +56,7 @@ public sealed class BTreeNode
         Array.Copy(Records, 0, records, 0, index);
         Array.Copy(Records, index + 1, records, index, Records.Length - (index + 1));
 
-        return new BTreeNode(Id, true, records, null);
+        return new BTreeNode(Id, true, records, null, Amount);
     }
 
     public BTreeNode WithUpdatedRecord(int index, Record record)
@@ -65,7 +67,7 @@ public sealed class BTreeNode
         Record[] records = (Record[])Records.Clone();
         records[index] = record;
 
-        return new BTreeNode(Id, true, records, null);
+        return new BTreeNode(Id, true, records, null, Amount);
     }
 
     public BTreeNode WithModifiedReference(int childIndex, BTreeNodeReference newChildRef)
@@ -76,7 +78,7 @@ public sealed class BTreeNode
         List<BTreeNodeReference> childrenRef = new List<BTreeNodeReference>(ChildrenRef);
         childrenRef[childIndex] = newChildRef;
 
-        return new BTreeNode(Id, false, null, childrenRef);
+        return new BTreeNode(Id, false, null, childrenRef, Amount);
     }
 
     public int GetIndexFromKey(RecordKey recordKey)
@@ -147,12 +149,11 @@ public sealed class BTreeNode
     public BTreeNodeReference GetSelfReference()
     {
         if (IsLeaf)
-            return new BTreeNodeReference(Records[0].Key, Records[Records.Length - 1].Key, Id);
-        return new BTreeNodeReference(ChildrenRef[0].FirstKey, ChildrenRef[ChildrenRef.Count - 1].LastKey, Id);
+            return new BTreeNodeReference(Records?[0].Key, Records?[Records.Length - 1].Key, Id, Amount);
+        return new BTreeNodeReference(ChildrenRef?[0].FirstKey, ChildrenRef?[ChildrenRef.Count - 1].LastKey, Id, Amount);
     }
 
-    public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference leftRef,
-        BTreeNodeReference rightRef)
+    public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference leftRef, BTreeNodeReference rightRef)
     {
         if (IsLeaf)
             throw new InvalidOperationException(
@@ -167,7 +168,7 @@ public sealed class BTreeNode
         newChildrenRef.Insert(index, leftRef);
         newChildrenRef.Insert(index + 1, rightRef);
 
-        return new BTreeNode(Id, false, null, newChildrenRef);
+        return new BTreeNode(Id, false, null, newChildrenRef, Amount);
     }
 
     public List<BTreeNodeReference> MatchingReferences(RecordKey key)
@@ -202,5 +203,10 @@ public sealed class BTreeNode
         }
 
         return result;
+    }
+
+    public decimal GetAmount()
+    {
+        return Amount;
     }
 }

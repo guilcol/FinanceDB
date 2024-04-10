@@ -86,6 +86,11 @@ public class BasicRs : IRecordStorage
 
     public decimal GetBalance(string accountId, RecordKey key)
     {
+        throw new NotImplementedException();
+    }
+
+    public decimal GetBalance(string accountId)
+    {
         // Date not implemented
         decimal result = 0;
         foreach (Record record in List(accountId)) 

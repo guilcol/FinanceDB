@@ -79,13 +79,13 @@ public class BTreeRs : IRecordStorage
 
         return 0;
     }
-
-    public int RecordCount()
+    
+    public decimal GetBalance(string accountId)
     {
-        throw new NotImplementedException();
+        return accounts[accountId].GetBalance();
     }
 
-    public bool ContainsKey(RecordKey key, BTreeNode node)
+    public int RecordCount()
     {
         throw new NotImplementedException();
     }
