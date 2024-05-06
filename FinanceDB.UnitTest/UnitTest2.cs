@@ -45,45 +45,45 @@ public class UnitTest2
         BTreeRs db = new BTreeRs(new Random(0), 3);
         
         // Generate random keys to be inserted under different account IDs
-        List<RecordKey> randomKeysEarth = GenerateRandomRecordKeys("Earth", 5, 9000);
-        List<RecordKey> randomKeysVenus  = GenerateRandomRecordKeys("Venus", 5, 9000);
-        List<RecordKey> randomKeysJupiter = GenerateRandomRecordKeys("Jupiter", 5, 9000);
+        List<RecordKey> randomKeysFalcon = GenerateRandomRecordKeys("Falcon", 5, 9000);
+        List<RecordKey> randomKeysEagle  = GenerateRandomRecordKeys("Eagle", 5, 9000);
+        List<RecordKey> randomKeysHawk = GenerateRandomRecordKeys("Hawk", 5, 9000);
      
         // Add all new records to the database
-        foreach (var item in randomKeysEarth)
+        foreach (var item in randomKeysFalcon)
             db.Insert(new Record(item, "", 0));
-        foreach (var item in randomKeysVenus)
+        foreach (var item in randomKeysEagle)
             db.Insert(new Record(item, "", 0));
-        foreach (var item in randomKeysJupiter)
+        foreach (var item in randomKeysHawk)
             db.Insert(new Record(item, "", 0));
 
         // Save database and build tree
         db.Save();
         
         // Obtain list of records from each accountId
-        IReadOnlyList<Record>? earthRecords = db.List("Earth");
-        IReadOnlyList<Record>? jupiterRecords = db.List("Jupiter");
-        IReadOnlyList<Record>? venusRecords = db.List("Venus");
+        IReadOnlyList<Record>? falconRecords = db.List("Falcon");
+        IReadOnlyList<Record>? eagleRecords = db.List("Eagle");
+        IReadOnlyList<Record>? hawkRecords = db.List("Hawk");
         
         Random rand = new Random();
 
         // Pick out one random record from each accountId
-        Record randomEarthRecord = earthRecords[rand.Next(earthRecords.Count-1)];
-        Record randomJupiterRecord = jupiterRecords[rand.Next(jupiterRecords.Count-1)];
-        Record randomVenusRecord = venusRecords[rand.Next(venusRecords.Count-1)];
+        Record randomFalconRecord = falconRecords[rand.Next(falconRecords.Count-1)];
+        Record randomEagleRecord = eagleRecords[rand.Next(eagleRecords.Count-1)];
+        Record randomHawkRecord = hawkRecords[rand.Next(hawkRecords.Count-1)];
 
         // Delete records
-        bool deleteEarthRecord = db.Delete(randomEarthRecord);
-        bool deleteJupiterRecord = db.Delete(randomJupiterRecord);
-        bool deleteVenusRecord = db.Delete(randomVenusRecord);
+        bool deleteFalconRecord = db.Delete(randomFalconRecord);
+        bool deleteEagleRecord = db.Delete(randomEagleRecord);
+        bool deleteHawkRecord = db.Delete(randomHawkRecord);
         
         // Save and build tree
         db.Save();
         
         // Assert records are no longer found in database
-        Assert.IsTrue(deleteEarthRecord);
-        Assert.IsTrue(deleteJupiterRecord);
-        Assert.IsTrue(deleteVenusRecord);
+        Assert.IsTrue(deleteFalconRecord);
+        Assert.IsTrue(deleteEagleRecord);
+        Assert.IsTrue(deleteHawkRecord);
 
     }
     
@@ -137,27 +137,27 @@ public class UnitTest2
         BTreeRs db = new BTreeRs(new Random(0), 3);
         
         // Generate random keys to be inserted under different account IDs
-        List<RecordKey> randomKeysEarth = GenerateRandomRecordKeys("Earth", 5, 9000);
-        List<RecordKey> randomKeysVenus  = GenerateRandomRecordKeys("Venus", 5, 9000);
-        List<RecordKey> randomKeysJupiter = GenerateRandomRecordKeys("Jupiter", 5, 9000);
+        List<RecordKey> randomKeysPolonium = GenerateRandomRecordKeys("Polonium", 5, 9000);
+        List<RecordKey> randomKeysCobalt  = GenerateRandomRecordKeys("Cobalt", 5, 9000);
+        List<RecordKey> randomKeysUranium = GenerateRandomRecordKeys("Uranium", 5, 9000);
      
         // Add all new records to the database
-        foreach (var item in randomKeysEarth)
+        foreach (var item in randomKeysPolonium)
             db.Insert(new Record(item, "", 0));
-        foreach (var item in randomKeysVenus)
+        foreach (var item in randomKeysCobalt)
             db.Insert(new Record(item, "", 0));
-        foreach (var item in randomKeysJupiter)
+        foreach (var item in randomKeysUranium)
             db.Insert(new Record(item, "", 0));
 
         db.Save();
         
-        IReadOnlyList<Record>? earthRecords = db.List("Earth");
-        IReadOnlyList<Record>? jupiterRecords = db.List("Jupiter");
-        IReadOnlyList<Record>? venusRecords = db.List("Venus");
+        IReadOnlyList<Record>? poloniumRecords = db.List("Polonium");
+        IReadOnlyList<Record>? cobaltRecords = db.List("Cobalt");
+        IReadOnlyList<Record>? uraniumRecords = db.List("Uranium");
         
-        Assert.AreEqual(5, earthRecords.Count);
-        Assert.AreEqual(5, jupiterRecords.Count);
-        Assert.AreEqual(5, venusRecords.Count);
+        Assert.AreEqual(5, poloniumRecords.Count);
+        Assert.AreEqual(5, cobaltRecords.Count);
+        Assert.AreEqual(5, uraniumRecords.Count);
     }
 
     [TestMethod]
@@ -169,13 +169,13 @@ public class UnitTest2
         Random rand = new Random();
         
         // Generate random keys to be inserted under different account IDs
-        List<RecordKey> randomKeysEarth = GenerateRandomRecordKeys("Earth", 200, 9000);
+        List<RecordKey> randomKeysAltair = GenerateRandomRecordKeys("Altair", 200, 9000);
         
         // Store correct result
         decimal correctResult = 0;
      
         // Add all new records to the database
-        foreach (var item in randomKeysEarth)
+        foreach (var item in randomKeysAltair)
         {
             decimal randomAmount = (decimal)rand.Next(-200, 1000);
             db.Insert(new Record(item, "", randomAmount));
@@ -185,7 +185,7 @@ public class UnitTest2
 
         db.Save();
         
-        Assert.AreEqual(correctResult, db.GetBalance("Earth"));
+        Assert.AreEqual(correctResult, db.GetBalance("Altair"));
     }
 
     [TestMethod]

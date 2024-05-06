@@ -11,8 +11,7 @@ public class AccountBTree
     private readonly string _accountId;
     private readonly Random _rand;
     public static int Degree;
-    private readonly Dictionary<long, BTreeNode> _cache = new Dictionary<long, BTreeNode>();
-    private List<long>? _registeredNodes = new List<long>();
+    private readonly Dictionary<long, BTreeNode> _cache = new();
     private readonly string path;
     public AccountBTree(Random rand, int deg, string accountId)
     {
