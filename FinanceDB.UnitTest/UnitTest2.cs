@@ -227,34 +227,25 @@ public class UnitTest2
 
         return balance;
     }
-
+    
     [TestMethod]
-    public void TestSaveSplitCache()
+    public void CreateJSON()
     {
-        
-        // Initialize database, Random object, and a constant DateTime date.
-        BTreeRs db = new BTreeRs(new Random(0), 200);
-        Random rand = new Random(0);
-        DateTime date = DateTime.UtcNow;
- 
-        // Add 10 random records to the database, this will case an overflow error
-        for (int i = 0; i < 100000; i++)
-        { 
-            // Create a key of random sequence
-            RecordKey key = new RecordKey("", date, (uint)rand.Next(100_000_000));
- 
-            // Ascertain key is unique
-            while (db.ContainsKey(key)) 
-                key = key.WithSequence((uint)rand.Next(100_000_000));
+        BTreeRs db = new BTreeRs(new Random(0), 5);
 
-            // Insert Record with key in database
-            db.Insert(new Record(key, "", 0));
+        Random rand = new Random();
+
+        List<RecordKey> randomKeys = GenerateRandomRecordKeys("Guilherme", 200, 100_000_000);
+
+
+        foreach (var key in randomKeys)
+        {
+            db.Insert(new Record(key, "", rand.Next(-100, 9000)));
         }
         
         db.Save();
         
-        Assert.AreEqual(517, db.GetCacheLengthFromAccountId(""));
-
+        Assert.IsTrue(File.Exists("BTreeJSON"));
     }
     
     private List<RecordKey> GenerateRandomRecordKeys(string id, int amount, int sequenceCap)

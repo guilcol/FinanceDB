@@ -7,11 +7,11 @@ public sealed class BTreeNode
     public long Id { get; }
     public bool IsLeaf { get; }
     public Record[]? Records { get; }
-    public List<BTreeNodeReference>? ChildrenRef { get; }
-    
+    public BTreeNodeReference[] ChildrenRef { get; }
+
     public decimal Amount;
 
-    public BTreeNode(long id, bool isLeaf, Record[]? records, List<BTreeNodeReference>? childrenRef, decimal amount)
+    public BTreeNode(long id, bool isLeaf, Record[]? records, BTreeNodeReference[]? childrenRef, decimal amount)
     {
         Id = id;
         IsLeaf = isLeaf;
@@ -23,13 +23,14 @@ public sealed class BTreeNode
     public bool isFull()
     {
         if (Records == null)
-            return ChildrenRef.Count < BTreeRs.degree;
+            return ChildrenRef.Length < BTreeRs.degree;
         return Records.Length < BTreeRs.degree; //TODO: Fix isFull() return true for any value under DEGREE
     }
+
     public bool isOverflowing()
     {
         if (Records == null)
-            return ChildrenRef.Count > BTreeRs.degree;
+            return ChildrenRef.Length > BTreeRs.degree;
         return Records.Length > BTreeRs.degree;
     }
 
@@ -75,7 +76,7 @@ public sealed class BTreeNode
         if (IsLeaf)
             throw new InvalidOperationException($"Operation is only allowed on internal nodes. Node {Id} is a leaf.");
 
-        List<BTreeNodeReference> childrenRef = new List<BTreeNodeReference>(ChildrenRef);
+        BTreeNodeReference[] childrenRef = ChildrenRef;
         childrenRef[childIndex] = newChildRef;
 
         return new BTreeNode(Id, false, null, childrenRef, Amount);
@@ -84,7 +85,7 @@ public sealed class BTreeNode
     public int GetIndexFromKey(RecordKey recordKey)
     {
         Record dummyRecord = new Record(recordKey, "", 0);
-        int index = Array.BinarySearch((Record[])Records, dummyRecord, ByKeyRecordComparer.Instance);
+        int index = Array.BinarySearch(Records, dummyRecord, ByKeyRecordComparer.Instance);
         return index;
     }
 
@@ -92,7 +93,7 @@ public sealed class BTreeNode
     {
         int left = 0;
 
-        int right = ChildrenRef.Count - 1;
+        int right = ChildrenRef.Length - 1;
 
         while (left <= right)
         {
@@ -127,7 +128,7 @@ public sealed class BTreeNode
     {
         if (index == 0)
             return (ChildrenRef[0], 0);
-        if (index == ChildrenRef.Count)
+        if (index == ChildrenRef.Length)
             return (ChildrenRef[index - 1], index - 1);
 
         if (rand.Next(2) == 0)
@@ -143,6 +144,7 @@ public sealed class BTreeNode
         {
             throw new Exception("For some reason, you managed to call this in a leaf node.");
         }
+
         int index = FindChildReference(dummyKey);
 
         if (index < 0)
@@ -155,53 +157,54 @@ public sealed class BTreeNode
     {
         if (IsLeaf)
             return new BTreeNodeReference(Records?[0].Key, Records?[Records.Length - 1].Key, Id, Amount);
-        return new BTreeNodeReference(ChildrenRef?[0].FirstKey, ChildrenRef?[ChildrenRef.Count - 1].LastKey, Id, Amount);
+        return new BTreeNodeReference(ChildrenRef?[0].FirstKey, ChildrenRef?[ChildrenRef.Length - 1].LastKey, Id,
+            Amount);
     }
 
-    public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference leftRef, BTreeNodeReference rightRef)
-    {
-        if (IsLeaf)
-            throw new InvalidOperationException(
-                $"Operation is only allowed on internal node. Node {Id} is not internal.");
-
-        List<BTreeNodeReference> newChildrenRef = new List<BTreeNodeReference>(ChildrenRef);
-
-        int index = newChildrenRef.BinarySearch(oldRef);
-
-        newChildrenRef.RemoveAt(index);
-
-        newChildrenRef.Insert(index, leftRef);
-        newChildrenRef.Insert(index + 1, rightRef);
-
-        return new BTreeNode(Id, false, null, newChildrenRef, Amount);
-    }
-
-    public BTreeNode WithSplitReference(BTreeNodeReference oldRef, BTreeNodeReference[] newRefs)
+    public BTreeNode WithNewReferences(BTreeNodeReference oldRef, BTreeNodeReference[] newRefs)
     {
         if (IsLeaf)
             throw new InvalidOperationException(
                 $"Operation is only allowed on internal node. Node {Id} is not internal.");
 
         // Convert the list of children references to a list to make modifications easier
-        List<BTreeNodeReference> newChildrenRef = new List<BTreeNodeReference>(ChildrenRef);
+        BTreeNodeReference[] newChildrenRef = ChildrenRef;
 
         // Find the index of oldRef in the list of children
-        int index = newChildrenRef.BinarySearch(oldRef, Comparer<BTreeNodeReference>.Default);
+        int index = Array.BinarySearch(newChildrenRef, oldRef);
 
         if (index < 0)
         {
             throw new ArgumentException("Reference not found in children", nameof(oldRef));
         }
 
-        // Remove the old reference
-        newChildrenRef.RemoveAt(index);
+        // Determine the size of the new array
+        int newSize = newChildrenRef.Length - 1 + newRefs.Length; // Remove one, add newRefs.Length
 
-        // Insert the new references starting from the found index
-        // We go in reverse order for Insert to keep the original order of newRefs
-        for (int i = newRefs.Length - 1; i >= 0; i--)
+        // Create a new array of the appropriate size
+        BTreeNodeReference[] updatedChildrenRef = new BTreeNodeReference[newSize];
+
+        // Copy elements from the old array to the new array up to the index of the old reference
+        for (int i = 0; i < index; i++)
         {
-            newChildrenRef.Insert(index, newRefs[i]);
+            updatedChildrenRef[i] = newChildrenRef[i];
         }
+
+        // Copy new references into the new array at the index
+        for (int i = 0; i < newRefs.Length; i++)
+        {
+            updatedChildrenRef[index + i] = newRefs[i];
+        }
+
+        // Copy the remaining elements from the old array to the new array after the new references
+        for (int i = index + 1; i < newChildrenRef.Length; i++)
+        {
+            updatedChildrenRef[i + newRefs.Length - 1] = newChildrenRef[i];
+        }
+
+        // Now, updatedChildrenRef contains all old references with the oldRef replaced by newRefs
+        newChildrenRef = updatedChildrenRef; // Assuming newChildrenRef can be reassigned
+
 
         // Create a new BTreeNode with the updated list of children references
         return new BTreeNode(Id, false, null, newChildrenRef, Amount);
@@ -221,7 +224,7 @@ public sealed class BTreeNode
 
         // todo: don't depend on accountId
 
-        for (int i = index + 1; i < ChildrenRef.Count; i++)
+        for (int i = index + 1; i < ChildrenRef.Length; i++)
         {
             BTreeNodeReference childRef = ChildrenRef[i];
 

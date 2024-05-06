@@ -1,8 +1,8 @@
-﻿using System.Data.Common;
-using System.Net;
-using System.Runtime.InteropServices.JavaScript;
-using System.Text.Json.Nodes;
+﻿
+using System.ComponentModel.Design;
+using System.Text.Json;
 using Newtonsoft.Json;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
 namespace FinanceDB;
 
@@ -12,12 +12,14 @@ public class AccountBTree
     private readonly Random _rand;
     public static int Degree;
     private readonly Dictionary<long, BTreeNode> _cache = new Dictionary<long, BTreeNode>();
-
+    private List<long>? _registeredNodes = new List<long>();
+    private readonly string path;
     public AccountBTree(Random rand, int deg, string accountId)
     {
         _rand = rand;
         Degree = deg;
         _accountId = accountId;
+        path = @"C:\\Users\\guilc\\RiderProjects\\FinanceDB\\FinanceDB\\Nodes\\" + accountId + @"\\";
     }
 
     public void Save()
@@ -37,8 +39,26 @@ public class AccountBTree
                 }
             }
         }
+        CreateNodeFile();
     }
 
+    private void CreateNodeFile()
+    {
+        foreach (var item in _cache)
+        {
+            long nodeId = item.Key;
+            BTreeNode node = item.Value;
+            string fileName = nodeId + ".json";
+            string filePath = path + fileName;
+            if (!File.Exists(filePath))
+            {
+                Directory.CreateDirectory(path);
+                string nodeToJson = JsonConvert.SerializeObject(node);
+                File.WriteAllText(filePath, nodeToJson);
+            }
+        }
+    }
+        
     public void Load()
     {
         throw new NotImplementedException();
@@ -208,14 +228,7 @@ public class AccountBTree
             SplitLeafNode(node);
             return;
         }
-
-        if (node.Id == 0)
-        {
-            SplitInternalRoot(node);
-            return;
-        }
-
-        SplitInternalNonRoot(node);
+        SplitInternalRoot(node);
     }
 
     private void SplitLeafNode(BTreeNode node)
@@ -256,8 +269,9 @@ public class AccountBTree
             }
             else
             {
-                // Create new ID todo: Make sure ID is unique
                 newId = _rand.NextInt64(long.MaxValue);
+                while (_cache.ContainsKey(newId))
+                    newId = _rand.NextInt64(long.MaxValue);
             }
 
             // Copy records into the new segment
@@ -275,135 +289,82 @@ public class AccountBTree
 
         if (node.Id == 0)
         {
-            BTreeNode newRoot = new BTreeNode(0, false, null, newReferences.ToList(), node.GetAmount());
+            BTreeNode newRoot = new BTreeNode(0, false, null, newReferences, node.GetAmount());
             PutOnCache(newRoot);
-            return;
         }
-
-        BTreeNode parentNode = FindParentNode(_cache[0], node.GetSelfReference());
-        BTreeNode newParentNode = parentNode.WithSplitReference(node.GetSelfReference(), newReferences);
-        PutOnCache(newParentNode);
+        else
+        {
+            BTreeNode parentNode = FindParentNode(_cache[0], node.GetSelfReference());
+            BTreeNode newParentNode = parentNode.WithNewReferences(node.GetSelfReference(), newReferences);
+            PutOnCache(newParentNode);
+        }
     }
-    
+
     public void SplitInternalRoot(BTreeNode node)
     {
-        // Find midpoint of Children References
-        int midPoint = node.ChildrenRef.Count / 2;
+        // Obtain length of children references
+        int totalLength = node.ChildrenRef.Length;
 
-        // Initialize BTreeNodeReference lists for the new nodes
-        List<BTreeNodeReference> lowerChildrenReferences = new List<BTreeNodeReference>();
-        List<BTreeNodeReference> upperChildrenReferences = new List<BTreeNodeReference>();
+        // Calculate the number of segments needed
+        int numSegments = totalLength / Degree;
 
-        // Variables to store the balance
-        Decimal lowerBalance = 0;
-        Decimal upperBalance = 0;
+        int capacity = numSegments * Degree;
+        if (capacity < totalLength)
+            ++numSegments;
 
-        // Transfer first half to lowerChildrenReferences
-        for (int i = 0; i < midPoint; i++)
+        int correctLength = totalLength / numSegments;
+
+        // Initialize arrays of new BTreeNodes
+        BTreeNode[] newNodes = new BTreeNode[numSegments];
+        BTreeNodeReference[] newReferences = new BTreeNodeReference[numSegments];
+
+        // Loop through all references and split them into chunks of correctLength
+        for (int start = 0, segmentIndex = 0; segmentIndex < numSegments; start += correctLength, segmentIndex++)
         {
-            BTreeNodeReference currentReference = node.ChildrenRef[i];
-            lowerChildrenReferences.Add(currentReference);
-            lowerBalance += currentReference.GetAmount();
+            int segmentLength;
+
+            // Calculate segment length for this iteration
+            if (segmentIndex == numSegments - 1)
+                segmentLength = totalLength - start;
+            else
+                segmentLength = correctLength;
+
+            long newId = _rand.NextInt64(long.MaxValue);
+            while (_cache.ContainsKey(newId))
+                newId = _rand.NextInt64(long.MaxValue);
+            
+            // Copy references into the new segment
+            BTreeNodeReference[] segment = new BTreeNodeReference[segmentLength];
+            Array.Copy(node.ChildrenRef, start, segment, 0, segmentLength);
+
+            // Calculate balance for the segment
+            decimal segmentBalance = segment.Sum(reference => reference.GetAmount());
+
+            // Store new node
+            newNodes[segmentIndex] = new BTreeNode(newId, false, null, segment, segmentBalance);
+            newReferences[segmentIndex] = newNodes[segmentIndex].GetSelfReference();
+            PutOnCache(newNodes[segmentIndex]);
         }
 
-        // Transfer second half to upperChildrenReferences
-        for (int i = midPoint; i < node.ChildrenRef.Count; i++)
+        if (node.Id == 0)
         {
-            BTreeNodeReference currentReference = node.ChildrenRef[i];
-            upperChildrenReferences.Add(currentReference);
-            upperBalance += currentReference.GetAmount();
+            BTreeNode newRoot = new BTreeNode(0, false, null, newReferences, node.GetAmount());
+            PutOnCache(newRoot);
         }
-
-        // Create random IDs for left and right nodes
-        long newLeftId = _rand.NextInt64(long.MaxValue);
-        long newRightId = _rand.NextInt64(long.MaxValue);
-
-        // Verify IDs are unique
-        while (File.Exists(newLeftId.ToString())) // Verify left ID is unique
-            newLeftId = _rand.NextInt64(long.MaxValue);
-        while (File.Exists(newRightId.ToString()))
-            newRightId = _rand.NextInt64(long.MaxValue);
-
-        // Create the new nodes.
-        BTreeNode lowerHalf = new BTreeNode(newLeftId, false, null, lowerChildrenReferences, lowerBalance);
-        BTreeNode upperHalf = new BTreeNode(newRightId, false, null, upperChildrenReferences, upperBalance);
-
-        // Create the references to be placed on the parent node
-        BTreeNodeReference lowerReference = lowerHalf.GetSelfReference();
-        BTreeNodeReference upperReference = upperHalf.GetSelfReference();
-
-        List<BTreeNodeReference> rootRefs = new List<BTreeNodeReference>();
-        rootRefs.Add(lowerReference);
-        rootRefs.Add(upperReference);
-
-        BTreeNode newRoot = new BTreeNode(0, false, null, rootRefs, lowerBalance + upperBalance);
-
-        PutOnCache(newRoot);
-        PutOnCache(lowerHalf);
-        PutOnCache(upperHalf);
+        else
+        {
+            BTreeNode parentNode = FindParentNode(_cache[0], node.GetSelfReference());
+            BTreeNode newParentNode = parentNode.WithNewReferences(node.GetSelfReference(), newReferences);
+            PutOnCache(newParentNode);
+        }
     }
 
-    public void SplitInternalNonRoot(BTreeNode node)
+    private BTreeNode FindParentNode(BTreeNode nodeTravel, BTreeNodeReference targetRef)
     {
-        // Find midpoint of Children References
-        int midPoint = node.ChildrenRef.Count / 2;
-
-        // Initialize BTreeNodeReference lists for the new nodes
-        List<BTreeNodeReference> lowerChildrenReferences = new List<BTreeNodeReference>();
-        List<BTreeNodeReference> upperChildrenReferences = new List<BTreeNodeReference>();
-
-        // Variables to store the balance
-        Decimal lowerBalance = 0;
-        Decimal upperBalance = 0;
-
-        // Transfer first half to lowerChildrenReferences
-        for (int i = 0; i < midPoint; i++)
-        {
-            BTreeNodeReference currentReference = node.ChildrenRef[i];
-            lowerChildrenReferences.Add(currentReference);
-            lowerBalance += currentReference.GetAmount();
-        }
-
-        // Transfer second half to upperChildrenReferences
-        for (int i = midPoint; i < node.ChildrenRef.Count; i++)
-        {
-            BTreeNodeReference currentReference = node.ChildrenRef[i];
-            upperChildrenReferences.Add(currentReference);
-            upperBalance += currentReference.GetAmount();
-        }
-
-        // Create random IDs for left and right nodes
-        long newLeftId = node.Id;
-        long newRightId = _rand.NextInt64(long.MaxValue);
-
-        // Verify ID is unique
-        while (File.Exists(newRightId.ToString()))
-            newRightId = _rand.NextInt64(long.MaxValue);
-
-        // Create the new nodes.
-        BTreeNode lowerHalf = new BTreeNode(newLeftId, false, null, lowerChildrenReferences, lowerBalance);
-        BTreeNode upperHalf = new BTreeNode(newRightId, false, null, upperChildrenReferences, upperBalance);
-
-        // Create the references to be placed on the parent node
-        BTreeNodeReference lowerReference = lowerHalf.GetSelfReference();
-        BTreeNodeReference upperReference = upperHalf.GetSelfReference();
-
-        BTreeNode parentNode = FindParentNode(_cache[0], node.GetSelfReference());
-
-        BTreeNode newParentNode =
-            parentNode.WithSplitReference(node.GetSelfReference(), lowerReference, upperReference);
-
-        PutOnCache(newParentNode);
-        PutOnCache(lowerHalf);
-        PutOnCache(upperHalf);
-    }
-
-    private BTreeNode FindParentNode(BTreeNode node, BTreeNodeReference targetRef)
-    {
-        BTreeNodeReference reference = node.ClosestReferenceInNode(targetRef);
+        BTreeNodeReference reference = nodeTravel.ClosestReferenceInNode(targetRef);
 
         if (reference == targetRef)
-            return node;
+            return nodeTravel;
 
         BTreeNode childNode = ReadNode(reference.ChildId);
 
@@ -601,11 +562,14 @@ public class AccountBTree
         }
 
         string fileName = $"{nodeId}.json";
+        string fullPath = Path.Combine(path, fileName);
 
-        if (!File.Exists(fileName))
+        if (!File.Exists(fullPath))
             return null;
-        string fileContent = File.ReadAllText(fileName);
-        return JsonConvert.DeserializeObject<BTreeNode>(fileContent);
+        string fileContent = File.ReadAllText(fullPath);
+        BTreeNode nodeFromFile = JsonConvert.DeserializeObject<BTreeNode>(fileContent);
+        PutOnCache(nodeFromFile);
+        return nodeFromFile;
     }
 
     public RecordKey AdjustKey(RecordKey key)
