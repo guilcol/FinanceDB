@@ -1,8 +1,4 @@
 ﻿
-using System.ComponentModel.Design;
-using System.Text.Json;
-using Newtonsoft.Json;
-using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 
 namespace FinanceDB;
 
@@ -11,14 +7,14 @@ public class AccountBTree
     private readonly string _accountId;
     private readonly Random _rand;
     public static int Degree;
-    private readonly Dictionary<long, BTreeNode> _cache = new();
-    private readonly string path;
+    private readonly INodeStorage _nodes;
+    
     public AccountBTree(Random rand, int deg, string accountId)
     {
         _rand = rand;
         Degree = deg;
         _accountId = accountId;
-        path = @"C:\\Users\\guilc\\RiderProjects\\FinanceDB\\FinanceDB\\Nodes\\" + accountId + @"\\";
+        _nodes = new FileNodeStorage(rand, accountId);
     }
 
     public void Save()
@@ -28,36 +24,20 @@ public class AccountBTree
         while (resetLoop)
         {
             resetLoop = false;
-            foreach (var item in _cache)
+            foreach (var item in _nodes.List())
             {
-                if (item.Value.isOverflowing()) // Check if current node is overflowing
+                if (item.isOverflowing()) // Check if current node is overflowing
                 {
-                    SplitNode(item.Value); // Split the overflowing node
+                    SplitNode(item); // Split the overflowing node
                     resetLoop = true;
                     break;
                 }
             }
         }
-        CreateNodeFile();
+        
+        _nodes.Save();
     }
 
-    private void CreateNodeFile()
-    {
-        foreach (var item in _cache)
-        {
-            long nodeId = item.Key;
-            BTreeNode node = item.Value;
-            string fileName = nodeId + ".json";
-            string filePath = path + fileName;
-            if (!File.Exists(filePath))
-            {
-                Directory.CreateDirectory(path);
-                string nodeToJson = JsonConvert.SerializeObject(node);
-                File.WriteAllText(filePath, nodeToJson);
-            }
-        }
-    }
-        
     public void Load()
     {
         throw new NotImplementedException();
@@ -65,11 +45,11 @@ public class AccountBTree
 
     public bool Insert(Record record)
     {
-        var root = ReadNode(0);
+        var root = _nodes.Get(0);
         if (root == null)
         {
             root = new BTreeNode(0, true, new[] { record }, null, record.GetAmount());
-            PutOnCache(root);
+            _nodes.Put(root);
             return true;
         }
 
@@ -79,7 +59,7 @@ public class AccountBTree
 
     public bool Delete(Record record)
     {
-        var root = ReadNode(0);
+        var root = _nodes.Get(0);
 
         if (root == null)
             throw new Exception("Null root.");
@@ -91,7 +71,7 @@ public class AccountBTree
 
     public bool Update(Record record)
     {
-        var root = ReadNode(0);
+        var root = _nodes.Get(0);
 
         if (root == null)
             throw new Exception("Null root.");
@@ -100,7 +80,6 @@ public class AccountBTree
 
         return result.Updated;
     }
-
 
     private (bool Inserted, BTreeNode Node) InsertOnSubtree(BTreeNode node, Record record)
     {
@@ -115,7 +94,7 @@ public class AccountBTree
 
             // Return new node with inserted record
             BTreeNode newNode = node.WithNewRecord(~index, record);
-            PutOnCache(newNode);
+            _nodes.Put(newNode);
             return (Inserted: true, Node: newNode);
         }
 
@@ -129,7 +108,7 @@ public class AccountBTree
             selectedChild = node.ChildrenRef[childIndex];
 
         // Upon finding correct reference, recursively call child
-        BTreeNode childNode = ReadNode(selectedChild.ChildId);
+        BTreeNode childNode = _nodes.Get(selectedChild.ChildId);
         (bool Inserted, BTreeNode Node) subtreeResult = InsertOnSubtree(childNode, record);
 
         // If insertion worked, get reference for new node and pass to parent
@@ -137,7 +116,7 @@ public class AccountBTree
         {
             BTreeNodeReference newChildRef = subtreeResult.Node.GetSelfReference();
             BTreeNode newNode = node.WithModifiedReference(childIndex, newChildRef);
-            PutOnCache(newNode);
+            _nodes.Put(newNode);
             return (Inserted: true, Node: newNode);
         }
 
@@ -159,7 +138,7 @@ public class AccountBTree
 
             // Return new node with deleted record` 
             BTreeNode newNode = node.WithDeletedRecord(index, record);
-            PutOnCache(newNode);
+            _nodes.Put(newNode);
             return (Deleted: true, Node: newNode);
         }
 
@@ -170,14 +149,14 @@ public class AccountBTree
             return (Deleted: false, Node: null);
         selectedChild = node.ChildrenRef[childIndex];
 
-        BTreeNode childNode = ReadNode(selectedChild.ChildId);
+        BTreeNode childNode = _nodes.Get(selectedChild.ChildId);
         (bool Deleted, BTreeNode Node) subtreeResult = DeleteOnSubtree(childNode, record);
 
         if (subtreeResult.Deleted)
         {
             BTreeNodeReference newChildRef = subtreeResult.Node.GetSelfReference();
             BTreeNode newNode = node.WithModifiedReference(childIndex, newChildRef);
-            PutOnCache(newNode);
+            _nodes.Put(newNode);
             return (Deleted: true, Node: newNode);
         }
 
@@ -195,7 +174,7 @@ public class AccountBTree
             }
 
             BTreeNode newNode = node.WithUpdatedRecord(index, record);
-            PutOnCache(newNode);
+            _nodes.Put(newNode);
             return (Updated: true, Node: newNode);
         }
 
@@ -206,14 +185,14 @@ public class AccountBTree
             return (Updated: false, Node: null);
         selectedChild = node.ChildrenRef[childIndex];
 
-        BTreeNode childNode = ReadNode(selectedChild.ChildId);
+        BTreeNode childNode = _nodes.Get(selectedChild.ChildId);
         (bool Updated, BTreeNode Node) subtreeResult = UpdateOnSubtree(childNode, record);
 
         if (subtreeResult.Updated)
         {
             BTreeNodeReference newChildRef = subtreeResult.Node.GetSelfReference();
             BTreeNode newNode = node.WithModifiedReference(childIndex, newChildRef);
-            PutOnCache(newNode);
+            _nodes.Put(newNode);
             return (Updated: true, Node: newNode);
         }
 
@@ -268,9 +247,7 @@ public class AccountBTree
             }
             else
             {
-                newId = _rand.NextInt64(long.MaxValue);
-                while (_cache.ContainsKey(newId))
-                    newId = _rand.NextInt64(long.MaxValue);
+                newId = _nodes.GenerateNodeId();
             }
 
             // Copy records into the new segment
@@ -283,19 +260,19 @@ public class AccountBTree
             // Store new node
             newNodes[segmentIndex] = new BTreeNode(newId, true, segment, null, segmentBalance);
             newReferences[segmentIndex] = newNodes[segmentIndex].GetSelfReference();
-            PutOnCache(newNodes[segmentIndex]);
+            _nodes.Put(newNodes[segmentIndex]);
         }
 
         if (node.Id == 0)
         {
             BTreeNode newRoot = new BTreeNode(0, false, null, newReferences, node.GetAmount());
-            PutOnCache(newRoot);
+            _nodes.Put(newRoot);
         }
         else
         {
-            BTreeNode parentNode = FindParentNode(_cache[0], node.GetSelfReference());
+            BTreeNode parentNode = FindParentNode(_nodes.Get(0), node.GetSelfReference());
             BTreeNode newParentNode = parentNode.WithNewReferences(node.GetSelfReference(), newReferences);
-            PutOnCache(newParentNode);
+            _nodes.Put(newParentNode);
         }
     }
 
@@ -328,9 +305,7 @@ public class AccountBTree
             else
                 segmentLength = correctLength;
 
-            long newId = _rand.NextInt64(long.MaxValue);
-            while (_cache.ContainsKey(newId))
-                newId = _rand.NextInt64(long.MaxValue);
+            long newId = _nodes.GenerateNodeId();
             
             // Copy references into the new segment
             BTreeNodeReference[] segment = new BTreeNodeReference[segmentLength];
@@ -342,19 +317,19 @@ public class AccountBTree
             // Store new node
             newNodes[segmentIndex] = new BTreeNode(newId, false, null, segment, segmentBalance);
             newReferences[segmentIndex] = newNodes[segmentIndex].GetSelfReference();
-            PutOnCache(newNodes[segmentIndex]);
+            _nodes.Put(newNodes[segmentIndex]);
         }
 
         if (node.Id == 0)
         {
             BTreeNode newRoot = new BTreeNode(0, false, null, newReferences, node.GetAmount());
-            PutOnCache(newRoot);
+            _nodes.Put(newRoot);
         }
         else
         {
-            BTreeNode parentNode = FindParentNode(_cache[0], node.GetSelfReference());
+            BTreeNode parentNode = FindParentNode(_nodes.Get(0), node.GetSelfReference());
             BTreeNode newParentNode = parentNode.WithNewReferences(node.GetSelfReference(), newReferences);
-            PutOnCache(newParentNode);
+            _nodes.Put(newParentNode);
         }
     }
 
@@ -365,16 +340,9 @@ public class AccountBTree
         if (reference == targetRef)
             return nodeTravel;
 
-        BTreeNode childNode = ReadNode(reference.ChildId);
+        BTreeNode childNode = _nodes.Get(reference.ChildId);
 
         return FindParentNode(childNode, targetRef);
-    }
-
-    private void PutOnCache(BTreeNode node)
-    {
-        if (_cache.ContainsKey(node.Id))
-            _cache.Remove(node.Id);
-        _cache.Add(node.Id, node);
     }
 
     private int GetIndexFromKey(RecordKey key, Record[] list)
@@ -387,7 +355,7 @@ public class AccountBTree
     public IReadOnlyList<Record>? List()
     {
         RecordKey dummyKey = new RecordKey(_accountId, DateTime.MinValue, 0);
-        return CollectRecordsByAccountId(dummyKey, ReadNode(0), new List<Record>());
+        return CollectRecordsByAccountId(dummyKey, _nodes.Get(0), new List<Record>());
     }
 
     private List<Record> CollectRecordsByAccountId(RecordKey key, BTreeNode node, List<Record> list)
@@ -400,7 +368,7 @@ public class AccountBTree
         {
             foreach (BTreeNodeReference childRef in node.ChildrenRef)
             {
-                BTreeNode childNode = ReadNode(childRef.ChildId);
+                BTreeNode childNode = _nodes.Get(childRef.ChildId);
                 result = CollectRecordsByAccountId(key, childNode, list);
             }
         }
@@ -410,12 +378,12 @@ public class AccountBTree
 
     public decimal GetBalance()
     {
-        return ReadNode(0).GetAmount();
+        return _nodes.Get(0).GetAmount();
     }
 
     public decimal GetBalance(RecordKey key)
     {
-        return CollectBalanceByAccountId(key, ReadNode(0), 0);
+        return CollectBalanceByAccountId(key, _nodes.Get(0), 0);
     }
 
 
@@ -450,7 +418,7 @@ public class AccountBTree
                 {
                     // In case key is not larger than reference's last key, it must be inside this reference
                     // So we read the reference's child node and recursively call this method with the child node
-                    BTreeNode childNode = ReadNode(childRef.ChildId);
+                    BTreeNode childNode = _nodes.Get(childRef.ChildId);
                     return CollectBalanceByAccountId(key, childNode, result);
                 }
             }
@@ -471,10 +439,11 @@ public class AccountBTree
 
     public bool ContainsKey(RecordKey key)
     {
-        if (_cache.Count == 0)
+        var root = _nodes.Get(0);
+        if (root == null)
             return false;
 
-        return ContainsKeyInternal(key, ReadNode(0));
+        return ContainsKeyInternal(key, _nodes.Get(0));
     }
 
     private bool ContainsKeyInternal(RecordKey key, BTreeNode node)
@@ -489,7 +458,7 @@ public class AccountBTree
 
         BTreeNodeReference childRef = node.ChildrenRef[childRefIndex];
 
-        BTreeNode childNode = ReadNode(childRef.ChildId);
+        BTreeNode childNode = _nodes.Get(childRef.ChildId);
 
         return ContainsKeyInternal(key, childNode);
     }
@@ -504,7 +473,7 @@ public class AccountBTree
 
     public Record Read(RecordKey key)
     {
-        var root = ReadNode(0);
+        var root = _nodes.Get(0);
         if (root == null)
             return null;
         Record record = ReadFromSubtree(key, root);
@@ -529,7 +498,7 @@ public class AccountBTree
             throw new Exception("Record does not exist.");
         selectedChild = node.ChildrenRef[childIndex];
 
-        BTreeNode childNode = ReadNode(selectedChild.ChildId);
+        BTreeNode childNode = _nodes.Get(selectedChild.ChildId);
 
         record = ReadFromSubtree(key, childNode);
 
@@ -550,25 +519,7 @@ public class AccountBTree
 
     public int CacheLength()
     {
-        return _cache.Count;
-    }
-
-    private BTreeNode ReadNode(long nodeId)
-    {
-        if (_cache.ContainsKey(nodeId))
-        {
-            return _cache[nodeId];
-        }
-
-        string fileName = $"{nodeId}.json";
-        string fullPath = Path.Combine(path, fileName);
-
-        if (!File.Exists(fullPath))
-            return null;
-        string fileContent = File.ReadAllText(fullPath);
-        BTreeNode nodeFromFile = JsonConvert.DeserializeObject<BTreeNode>(fileContent);
-        PutOnCache(nodeFromFile);
-        return nodeFromFile;
+        return _nodes.CacheLength();
     }
 
     public RecordKey AdjustKey(RecordKey key)
