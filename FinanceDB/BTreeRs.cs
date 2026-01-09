@@ -27,7 +27,7 @@ public class BTreeRs : IRecordStorage
     public void Load()
     {
         // Scan the Nodes directory for existing account folders
-        string nodesPath = @"C:\Users\guilc\RiderProjects\FinanceDB\FinanceDB\Nodes\";
+        string nodesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Nodes");
         if (!Directory.Exists(nodesPath))
             return;
 

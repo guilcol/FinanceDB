@@ -11,7 +11,7 @@ public class FileNodeStorage : INodeStorage
     public FileNodeStorage(Random rand, string accountId)
     {
         _rand = rand;
-        path = @"C:\\Users\\guilc\\RiderProjects\\FinanceDB\\FinanceDB\\Nodes\\" + accountId + @"\\";
+        path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Nodes", accountId);
     }
 
     public BTreeNode? Get(long nodeId)
