@@ -8,7 +8,7 @@ namespace FinanceDB;
 using System;
 using System.IO;
 
-public class BasicRs : IRecordStorage
+public class  BasicRs : IRecordStorage
 {
     private string FileName;
     private List<Record> database = new List<Record>();

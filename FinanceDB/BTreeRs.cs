@@ -26,7 +26,19 @@ public class BTreeRs : IRecordStorage
 
     public void Load()
     {
-        throw new NotImplementedException();
+        // Scan the Nodes directory for existing account folders
+        string nodesPath = @"C:\Users\guilc\RiderProjects\FinanceDB\FinanceDB\Nodes\";
+        if (!Directory.Exists(nodesPath))
+            return;
+
+        foreach (var accountDir in Directory.GetDirectories(nodesPath))
+        {
+            string accountId = Path.GetFileName(accountDir);
+            if (!accounts.ContainsKey(accountId))
+            {
+                accounts[accountId] = new AccountBTree(rand, degree, accountId);
+            }
+        }
     }
 
     public bool Insert(Record record)
@@ -57,16 +69,26 @@ public class BTreeRs : IRecordStorage
 
     bool IRecordStorage.Delete(Record record)
     {
-        throw new NotImplementedException();
+        return Delete(record);
     }
 
     public bool Delete(RecordKey key)
     {
-        throw new NotImplementedException();
+        if (!accounts.ContainsKey(key.AccountId))
+            return false;
+
+        Record record = accounts[key.AccountId].Read(key);
+        if (record == null)
+            return false;
+
+        return accounts[key.AccountId].Delete(record);
     }
 
     public IReadOnlyList<Record>? List(string accountId)
     {
+        if (!accounts.ContainsKey(accountId))
+            return null;
+
         return accounts[accountId].List();
     }
 
@@ -82,12 +104,20 @@ public class BTreeRs : IRecordStorage
     
     public decimal GetBalance(string accountId)
     {
+        if (!accounts.ContainsKey(accountId))
+            return 0;
+
         return accounts[accountId].GetBalance();
     }
 
     public int RecordCount()
     {
-        throw new NotImplementedException();
+        int count = 0;
+        foreach (var accountTree in accounts)
+        {
+            count += accountTree.Value.RecordCount();
+        }
+        return count;
     }
 
     public bool ContainsKey(RecordKey key)
@@ -104,9 +134,12 @@ public class BTreeRs : IRecordStorage
         return false;
     }
 
-    public Record Read(RecordKey key)
+    public Record? Read(RecordKey key)
     {
-        return accounts[key.AccountId].Read(key); 
+        if (!accounts.ContainsKey(key.AccountId))
+            return null;
+
+        return accounts[key.AccountId].Read(key);
     }
     
 
@@ -127,7 +160,10 @@ public class BTreeRs : IRecordStorage
 
     public RecordKey AdjustKey(RecordKey key)
     {
-        throw new NotImplementedException();
+        if (!accounts.ContainsKey(key.AccountId))
+            return key;
+
+        return accounts[key.AccountId].AdjustKey(key);
     }
     
 }

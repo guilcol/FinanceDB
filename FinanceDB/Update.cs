@@ -1,25 +1,21 @@
-﻿using System.Globalization;
-using System.Text.RegularExpressions;
-
-namespace FinanceDB;
+﻿namespace FinanceDB;
 
 public class Update : Command
 {
     private readonly Record _record;
-    private readonly BasicRs _database;
-    
-    public Update(Record record, BasicRs db)
+    private readonly IRecordStorage _database;
+
+    public Update(Record record, IRecordStorage db)
     {
         _database = db;
         _record = record;
     }
-    public override void Execute()
+
+    public override bool Execute()
     {
-        if (_record != null)
-        {
-            _database.Delete(_record.Key);
-            _database.Insert(_record);
-        }
+        if (_record == null)
+            return false;
+
+        return _database.Update(_record);
     }
-    
 }

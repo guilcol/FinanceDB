@@ -2,15 +2,16 @@
 
 public class Save : Command
 {
-    private BasicRs database;
+    private readonly IRecordStorage _database;
 
-    public Save(BasicRs db)
+    public Save(IRecordStorage db)
     {
-        database = db;
+        _database = db;
     }
 
-    public override void Execute()
+    public override bool Execute()
     {
-        throw new NotImplementedException();
+        _database.Save();
+        return true;
     }
 }

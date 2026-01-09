@@ -40,7 +40,8 @@ public class AccountBTree
 
     public void Load()
     {
-        throw new NotImplementedException();
+        // Loading is handled lazily by FileNodeStorage.Get()
+        // which reads from disk if not in cache
     }
 
     public bool Insert(Record record)
@@ -429,7 +430,24 @@ public class AccountBTree
 
     public int RecordCount()
     {
-        throw new NotImplementedException();
+        var root = _nodes.Get(0);
+        if (root == null)
+            return 0;
+        return CountRecordsInSubtree(root);
+    }
+
+    private int CountRecordsInSubtree(BTreeNode node)
+    {
+        if (node.IsLeaf)
+            return node.Records?.Length ?? 0;
+
+        int count = 0;
+        foreach (var childRef in node.ChildrenRef)
+        {
+            var childNode = _nodes.Get(childRef.ChildId);
+            count += CountRecordsInSubtree(childNode);
+        }
+        return count;
     }
 
     public bool ContainsKey(RecordKey key, BTreeNode node)
@@ -524,6 +542,45 @@ public class AccountBTree
 
     public RecordKey AdjustKey(RecordKey key)
     {
-        throw new NotImplementedException();
+        var root = _nodes.Get(0);
+        if (root == null)
+            return key;
+
+        // Find the highest sequence number for records with the same accountId and date
+        uint maxSequence = FindMaxSequenceForDate(root, key.AccountId, key.Date);
+
+        if (maxSequence == 0 && !ContainsKey(key))
+            return key;
+
+        return key.WithSequence(maxSequence + 1);
+    }
+
+    private uint FindMaxSequenceForDate(BTreeNode node, string accountId, DateTime date)
+    {
+        uint maxSeq = 0;
+
+        if (node.IsLeaf)
+        {
+            foreach (var record in node.Records)
+            {
+                if (record.Key.AccountId == accountId && record.Key.Date == date)
+                {
+                    if (record.Key.Sequence > maxSeq)
+                        maxSeq = record.Key.Sequence;
+                }
+            }
+        }
+        else
+        {
+            foreach (var childRef in node.ChildrenRef)
+            {
+                var childNode = _nodes.Get(childRef.ChildId);
+                uint childMax = FindMaxSequenceForDate(childNode, accountId, date);
+                if (childMax > maxSeq)
+                    maxSeq = childMax;
+            }
+        }
+
+        return maxSeq;
     }
 }

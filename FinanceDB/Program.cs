@@ -1,16 +1,31 @@
-﻿using System.Diagnostics;
-using System.Resources;
-using System.Runtime.InteropServices.JavaScript;
-using FinanceDB;
+﻿using FinanceDB;
 
-BasicRs database = new BasicRs("database.json");
+const int BTreeDegree = 100;
+Random rand = new Random();
+
+BTreeRs database = new BTreeRs(rand, BTreeDegree);
+database.Load();
+
+ParseCommand parser = new ParseCommand(database);
+
+Console.WriteLine("FinanceDB - Financial Transaction Database");
+Console.WriteLine("Type 'help' for available commands.");
+Console.WriteLine();
 
 while (true)
 {
-    ProcessUserInput(Console.ReadLine());
-}
+    Console.Write("> ");
+    string? input = Console.ReadLine();
 
-void ProcessUserInput(string input)
-{
-    ParseCommand cmd = new ParseCommand(input, database);
+    if (string.IsNullOrWhiteSpace(input))
+        continue;
+
+    try
+    {
+        parser.Execute(input);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error: {ex.Message}");
+    }
 }

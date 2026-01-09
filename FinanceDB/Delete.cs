@@ -1,22 +1,21 @@
-﻿using System.Globalization;
-using System.Text.RegularExpressions;
-
-namespace FinanceDB;
+﻿namespace FinanceDB;
 
 public class Delete : Command
 {
-    private Record _record;
-    private BasicRs _database;
+    private readonly Record _record;
+    private readonly IRecordStorage _database;
 
-    public Delete(Record record, BasicRs db)
+    public Delete(Record record, IRecordStorage db)
     {
         _record = record;
         _database = db;
     }
-
-    public override void Execute()
+    
+    public override bool Execute()
     {
-        throw new NotImplementedException();
-    }
+        if (_record == null)
+            return false;
 
+        return _database.Delete(_record);
+    }
 }

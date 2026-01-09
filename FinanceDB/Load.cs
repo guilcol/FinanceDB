@@ -2,14 +2,16 @@
 
 public class Load : Command
 {
-    public List<Record> database;
+    private readonly IRecordStorage _database;
 
-    public Load(List<Record> db)
+    public Load(IRecordStorage db)
     {
-        database = db;
+        _database = db;
     }
-    public override void Execute()
+
+    public override bool Execute()
     {
- 
+        _database.Load();
+        return true;
     }
 }

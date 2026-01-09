@@ -14,7 +14,7 @@ public class FileNodeStorage : INodeStorage
         path = @"C:\\Users\\guilc\\RiderProjects\\FinanceDB\\FinanceDB\\Nodes\\" + accountId + @"\\";
     }
 
-    public BTreeNode Get(long nodeId)
+    public BTreeNode? Get(long nodeId)
     {
         if (_cache.ContainsKey(nodeId))
         {
@@ -25,23 +25,30 @@ public class FileNodeStorage : INodeStorage
         string fullPath = Path.Combine(path, fileName);
 
         if (!File.Exists(fullPath))
+        {
             return null;
+        }
         string fileContent = File.ReadAllText(fullPath);
-        BTreeNode nodeFromFile = JsonConvert.DeserializeObject<BTreeNode>(fileContent);
+        BTreeNode? nodeFromFile = JsonConvert.DeserializeObject<BTreeNode>(fileContent);
         Put(nodeFromFile);
         return nodeFromFile;
     }
-    
+
     public void Put(BTreeNode node)
     {
         if (_cache.ContainsKey(node.Id))
             _cache.Remove(node.Id);
         _cache.Add(node.Id, node);
     }
-    
+
     public void Delete(BTreeNode node)
     {
-        
+        if (_cache.ContainsKey(node.Id))
+            _cache.Remove(node.Id);
+        string fileName = $"{node.Id}.json";
+        string fullPath = Path.Combine(path, fileName); 
+        if (File.Exists(fullPath))
+            File.Delete(fullPath);
     }
 
     public ICollection<BTreeNode> List()
