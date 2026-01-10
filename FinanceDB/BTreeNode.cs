@@ -20,7 +20,7 @@ public sealed class BTreeNode
         Amount = amount;
     }
 
-    public bool isFull()
+    public bool IsFull()
     {
         if (Records == null)
             return ChildrenRef.Length < BTreeRs.degree;

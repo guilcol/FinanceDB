@@ -28,6 +28,9 @@ public class ParseCommand
             case "delete":
                 ExecuteDelete(parsedInput);
                 break;
+            case "delete_range":
+                ExecuteDeleteRange(parsedInput);
+                break;
             case "list":
                 ListRecords(parsedInput.Length > 1 ? parsedInput[1].Trim() : null);
                 break;
@@ -74,34 +77,138 @@ public class ParseCommand
     {
         if (parsedInput.Length < 2)
         {
-            Console.WriteLine("Usage: update <accountId> <datetime> \"<description>\" <amount>");
+            Console.WriteLine("Usage: update <accountId> <datetime> <sequence> [description='<text>'] [amount=<number>]");
             return;
         }
 
-        Record record = ParseRecord(parsedInput[1]);
-        bool success = new Update(record, _database).Execute();
+        // Pattern: accountId datetime sequence [description='...'] [amount=...]
+        string pattern = @"^(\S+)\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(\d+)(.*)$";
+        Match match = Regex.Match(parsedInput[1], pattern);
+
+        if (!match.Success)
+        {
+            Console.WriteLine("Invalid syntax. Usage: update <accountId> <datetime> <sequence> [description='<text>'] [amount=<number>]");
+            return;
+        }
+
+        string accountId = match.Groups[1].Value;
+        DateTime date = DateTime.Parse(match.Groups[2].Value, null, DateTimeStyles.AdjustToUniversal);
+        uint sequence = uint.Parse(match.Groups[3].Value);
+        string updatesPart = match.Groups[4].Value.Trim();
+
+        RecordKey key = new RecordKey(accountId, date, sequence);
+        Record? existingRecord = _database.Read(key);
+
+        if (existingRecord == null)
+        {
+            Console.WriteLine($"Record not found with key: {accountId} {date:O} {sequence}");
+            return;
+        }
+
+        // Parse optional updates
+        string? newDescription = null;
+        decimal? newAmount = null;
+
+        // Match description='...'
+        Match descMatch = Regex.Match(updatesPart, @"description='([^']*)'");
+        if (descMatch.Success)
+        {
+            newDescription = descMatch.Groups[1].Value;
+        }
+
+        // Match amount=...
+        Match amountMatch = Regex.Match(updatesPart, @"amount=(-?\d+(?:\.\d+)?)");
+        if (amountMatch.Success)
+        {
+            newAmount = decimal.Parse(amountMatch.Groups[1].Value, CultureInfo.InvariantCulture);
+        }
+
+        if (newDescription == null && newAmount == null)
+        {
+            Console.WriteLine("No updates specified. Use description='<text>' and/or amount=<number>");
+            return;
+        }
+
+        // Apply updates
+        Record updatedRecord = new Record(
+            key,
+            newDescription ?? existingRecord.Description,
+            newAmount ?? existingRecord.Amount
+        );
+
+        bool success = new Update(updatedRecord, _database).Execute();
 
         if (success)
-            Console.WriteLine($"Record updated in account '{record.Key.AccountId}'.");
+            Console.WriteLine($"Record updated in account '{accountId}'.");
         else
-            Console.WriteLine("Failed to update record. Record not found.");
+            Console.WriteLine("Failed to update record.");
     }
 
     private void ExecuteDelete(string[] parsedInput)
     {
         if (parsedInput.Length < 2)
         {
-            Console.WriteLine("Usage: delete <accountId> <datetime> \"<description>\" <amount>");
+            Console.WriteLine("Usage: delete <accountId> <datetime> <sequence>");
             return;
         }
 
-        Record record = ParseRecord(parsedInput[1]);
-        bool success = new Delete(record, _database).Execute();
+        // Pattern: accountId datetime sequence
+        string pattern = @"^(\S+)\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(\d+)$";
+        Match match = Regex.Match(parsedInput[1], pattern);
+
+        if (!match.Success)
+        {
+            Console.WriteLine("Invalid syntax. Usage: delete <accountId> <datetime> <sequence>");
+            return;
+        }
+
+        string accountId = match.Groups[1].Value;
+        DateTime date = DateTime.Parse(match.Groups[2].Value, null, DateTimeStyles.AdjustToUniversal);
+        uint sequence = uint.Parse(match.Groups[3].Value);
+
+        RecordKey key = new RecordKey(accountId, date, sequence);
+        bool success = _database.Delete(key);
 
         if (success)
-            Console.WriteLine($"Record deleted from account '{record.Key.AccountId}'.");
+            Console.WriteLine($"Record deleted from account '{accountId}'.");
         else
             Console.WriteLine("Failed to delete record. Record not found.");
+    }
+
+    private void ExecuteDeleteRange(string[] parsedInput)
+    {
+        if (parsedInput.Length < 2)
+        {
+            Console.WriteLine("Usage: delete_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
+            return;
+        }
+
+        // Pattern: accountId from datetime sequence to datetime sequence
+        string pattern = @"^(\S+)\s+from\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(\d+)\s+to\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(\d+)$";
+        Match match = Regex.Match(parsedInput[1], pattern);
+
+        if (!match.Success)
+        {
+            Console.WriteLine("Invalid syntax. Usage: delete_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
+            return;
+        }
+
+        string accountId = match.Groups[1].Value;
+        DateTime startDate = DateTime.Parse(match.Groups[2].Value, null, DateTimeStyles.AdjustToUniversal);
+        uint startSequence = uint.Parse(match.Groups[3].Value);
+        DateTime endDate = DateTime.Parse(match.Groups[4].Value, null, DateTimeStyles.AdjustToUniversal);
+        uint endSequence = uint.Parse(match.Groups[5].Value);
+
+        RecordKey startKey = new RecordKey(accountId, startDate, startSequence);
+        RecordKey endKey = new RecordKey(accountId, endDate, endSequence);
+
+        var command = new DeleteRange(startKey, endKey, _database);
+        command.Execute();
+
+        if (command.DeletedCount > 0)
+            Console.WriteLine($"{command.DeletedCount} record(s) deleted from account '{accountId}'.");
+        else
+            Console.WriteLine("No records found in the specified range.");
     }
 
     private Record ParseRecord(string tokens)
@@ -159,7 +266,7 @@ public class ParseCommand
         Console.WriteLine($"Records for account '{accountId}':");
         foreach (var record in records)
         {
-            Console.WriteLine($"  {record.Key.Date:O} | {record.GetDescription(),-30} | {record.GetAmount():C}");
+            Console.WriteLine($"  {record.Key.AccountId} {record.Key.Date:O} {record.Key.Sequence} | {record.GetDescription(),-30} | {record.GetAmount():C}");
         }
         Console.WriteLine($"Total: {records.Count} record(s)");
     }
@@ -187,8 +294,9 @@ public class ParseCommand
     {
         Console.WriteLine("Available commands:");
         Console.WriteLine("  insert <accountId> [<datetime>] \"<description>\" <amount>");
-        Console.WriteLine("  update <accountId> <datetime> \"<description>\" <amount>");
-        Console.WriteLine("  delete <accountId> <datetime> \"<description>\" <amount>");
+        Console.WriteLine("  update <accountId> <datetime> <sequence> [description='<text>'] [amount=<number>]");
+        Console.WriteLine("  delete <accountId> <datetime> <sequence>");
+        Console.WriteLine("  delete_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
         Console.WriteLine("  list <accountId>");
         Console.WriteLine("  balance <accountId>");
         Console.WriteLine("  save");
@@ -197,5 +305,9 @@ public class ParseCommand
         Console.WriteLine("Examples:");
         Console.WriteLine("  insert checking 2024-01-15T10:30:00Z \"Coffee purchase\" 5.50");
         Console.WriteLine("  insert checking \"Coffee purchase\" 5.50  (uses current time)");
+        Console.WriteLine("  update checking 2024-01-15T10:30:00Z 0 description='Updated description'");
+        Console.WriteLine("  update checking 2024-01-15T10:30:00Z 0 amount=10.50");
+        Console.WriteLine("  update checking 2024-01-15T10:30:00Z 0 description='New desc' amount=15.00");
+        Console.WriteLine("  delete_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999");
     }
 }

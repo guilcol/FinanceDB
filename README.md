@@ -22,6 +22,7 @@ dotnet run --project FinanceDB
 | `insert` | Add a new transaction |
 | `update` | Change an existing transaction |
 | `delete` | Remove a transaction |
+| `delete_range` | Remove all transactions in a date/sequence range |
 | `list` | Show all transactions for an account |
 | `balance` | Show the total for an account |
 | `save` | Save data to files |
@@ -49,14 +50,28 @@ Check the balance:
 balance checking
 ```
 
+Delete all transactions in January 2024 (inclusive range):
+```
+delete_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999
+```
+
 ## How data is stored
 
 Records are stored in a B-tree, a tree structure that keeps data sorted and allows fast lookups.
 
+### Records and keys
+
+Each record has a **RecordKey** made of three fields:
+- **AccountId** - which account the record belongs to
+- **Date** - when the transaction happened
+- **Sequence** - a number to tell apart multiple records with the same date
+
+The Sequence field exists because you might have several transactions on the same day. When you insert a record, the system looks at all existing records for that account and date, finds the highest sequence number, and assigns the next one. If no records exist for that date, it uses 0. This makes every key unique within an account.
+
 ### B-tree basics
 
 - The tree is made of **nodes**. Each node holds multiple records.
-- Records are sorted by account, then by date, then by a sequence number.
+- Records are sorted by AccountId, then Date, then Sequence.
 - When a node gets too full, it **splits** into smaller nodes.
 - The tree stays balanced - all leaf nodes are at the same depth.
 - The **degree** (set to 100) controls how many records fit in each node before splitting.

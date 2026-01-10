@@ -63,6 +63,24 @@ public class  BasicRs : IRecordStorage
         return true;
     }
 
+    public int DeleteRange(RecordKey startKey, RecordKey endKey)
+    {
+        int startIndex = GetIndexFromKey(startKey);
+        if (startIndex < 0)
+            startIndex = ~startIndex;
+
+        int endIndex = GetIndexFromKey(endKey);
+        if (endIndex < 0)
+            endIndex = ~endIndex - 1; // Insert position - 1, since end is inclusive
+
+        if (startIndex > endIndex || startIndex >= database.Count)
+            return 0;
+
+        int count = endIndex - startIndex + 1;
+        database.RemoveRange(startIndex, count);
+        return count;
+    }
+
     public IReadOnlyList<Record> List(string accountId)
     {
         RecordKey firstKey = new RecordKey(accountId, DateTime.MinValue, 0);   

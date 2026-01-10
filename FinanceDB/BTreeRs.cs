@@ -84,6 +84,28 @@ public class BTreeRs : IRecordStorage
         return accounts[key.AccountId].Delete(record);
     }
 
+    public int DeleteRange(RecordKey startKey, RecordKey endKey)
+    {
+        if (!accounts.ContainsKey(startKey.AccountId))
+            return 0;
+
+        var allRecords = accounts[startKey.AccountId].List();
+        if (allRecords == null)
+            return 0;
+
+        int count = 0;
+        foreach (var record in allRecords)
+        {
+            // Inclusive range: startKey <= record.Key <= endKey
+            if (record.Key.CompareTo(startKey) >= 0 && record.Key.CompareTo(endKey) <= 0)
+            {
+                if (accounts[startKey.AccountId].Delete(record))
+                    count++;
+            }
+        }
+        return count;
+    }
+
     public IReadOnlyList<Record>? List(string accountId)
     {
         if (!accounts.ContainsKey(accountId))

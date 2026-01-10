@@ -14,6 +14,8 @@ public interface IRecordStorage
     
     public bool Delete(RecordKey key);
 
+    public int DeleteRange(RecordKey startKey, RecordKey endKey);
+
     public IReadOnlyList<Record>? List(string accountId);
 
     public decimal GetBalance(string accountId, RecordKey key);
