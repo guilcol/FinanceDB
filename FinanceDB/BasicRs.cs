@@ -102,6 +102,26 @@ public class  BasicRs : IRecordStorage
         return result;
     }
 
+    public IReadOnlyList<Record>? ListRange(RecordKey startKey, RecordKey endKey)
+    {
+        int startIndex = GetIndexFromKey(startKey);
+        if (startIndex < 0)
+            startIndex = ~startIndex;
+
+        List<Record> result = new List<Record>();
+
+        for (int i = startIndex; i < database.Count; i++)
+        {
+            Record record = database[i];
+            // Inclusive range: startKey <= record.Key <= endKey
+            if (record.Key.CompareTo(endKey) > 0)
+                break;
+            result.Add(record);
+        }
+
+        return result;
+    }
+
     public decimal GetBalance(string accountId, RecordKey key)
     {
         throw new NotImplementedException();

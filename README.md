@@ -24,6 +24,7 @@ dotnet run --project FinanceDB
 | `delete` | Remove a transaction |
 | `delete_range` | Remove all transactions in a date/sequence range |
 | `list` | Show all transactions for an account |
+| `list_range` | Show transactions in a date/sequence range |
 | `balance` | Show the total for an account |
 | `save` | Save data to files |
 | `exit` | Save and quit |
@@ -53,6 +54,11 @@ balance checking
 Delete all transactions in January 2024 (inclusive range):
 ```
 delete_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999
+```
+
+List transactions in January 2024 (inclusive range):
+```
+list_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999
 ```
 
 ## How data is stored

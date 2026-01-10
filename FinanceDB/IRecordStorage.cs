@@ -18,6 +18,8 @@ public interface IRecordStorage
 
     public IReadOnlyList<Record>? List(string accountId);
 
+    public IReadOnlyList<Record>? ListRange(RecordKey startKey, RecordKey endKey);
+
     public decimal GetBalance(string accountId, RecordKey key);
 
     public int RecordCount();

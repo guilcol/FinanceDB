@@ -34,6 +34,9 @@ public class ParseCommand
             case "list":
                 ListRecords(parsedInput.Length > 1 ? parsedInput[1].Trim() : null);
                 break;
+            case "list_range":
+                ExecuteListRange(parsedInput);
+                break;
             case "balance":
                 ShowBalance(parsedInput.Length > 1 ? parsedInput[1].Trim() : null);
                 break;
@@ -211,6 +214,49 @@ public class ParseCommand
             Console.WriteLine("No records found in the specified range.");
     }
 
+    private void ExecuteListRange(string[] parsedInput)
+    {
+        if (parsedInput.Length < 2)
+        {
+            Console.WriteLine("Usage: list_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
+            return;
+        }
+
+        // Pattern: accountId from datetime sequence to datetime sequence
+        string pattern = @"^(\S+)\s+from\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(\d+)\s+to\s+(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)\s+(\d+)$";
+        Match match = Regex.Match(parsedInput[1], pattern);
+
+        if (!match.Success)
+        {
+            Console.WriteLine("Invalid syntax. Usage: list_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
+            return;
+        }
+
+        string accountId = match.Groups[1].Value;
+        DateTime startDate = DateTime.Parse(match.Groups[2].Value, null, DateTimeStyles.AdjustToUniversal);
+        uint startSequence = uint.Parse(match.Groups[3].Value);
+        DateTime endDate = DateTime.Parse(match.Groups[4].Value, null, DateTimeStyles.AdjustToUniversal);
+        uint endSequence = uint.Parse(match.Groups[5].Value);
+
+        RecordKey startKey = new RecordKey(accountId, startDate, startSequence);
+        RecordKey endKey = new RecordKey(accountId, endDate, endSequence);
+
+        var records = _database.ListRange(startKey, endKey);
+
+        if (records == null || records.Count == 0)
+        {
+            Console.WriteLine("No records found in the specified range.");
+            return;
+        }
+
+        Console.WriteLine($"Records for account '{accountId}' in range:");
+        foreach (var record in records)
+        {
+            Console.WriteLine($"  {record.Key.AccountId} {record.Key.Date:O} {record.Key.Sequence} | {record.GetDescription(),-30} | {record.GetAmount():C}");
+        }
+        Console.WriteLine($"Total: {records.Count} record(s)");
+    }
+
     private Record ParseRecord(string tokens)
     {
         // Pattern with datetime: accountId datetime "description" amount
@@ -298,6 +344,7 @@ public class ParseCommand
         Console.WriteLine("  delete <accountId> <datetime> <sequence>");
         Console.WriteLine("  delete_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
         Console.WriteLine("  list <accountId>");
+        Console.WriteLine("  list_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
         Console.WriteLine("  balance <accountId>");
         Console.WriteLine("  save");
         Console.WriteLine("  exit");
@@ -309,5 +356,6 @@ public class ParseCommand
         Console.WriteLine("  update checking 2024-01-15T10:30:00Z 0 amount=10.50");
         Console.WriteLine("  update checking 2024-01-15T10:30:00Z 0 description='New desc' amount=15.00");
         Console.WriteLine("  delete_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999");
+        Console.WriteLine("  list_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999");
     }
 }

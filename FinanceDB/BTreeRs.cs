@@ -114,6 +114,27 @@ public class BTreeRs : IRecordStorage
         return accounts[accountId].List();
     }
 
+    public IReadOnlyList<Record>? ListRange(RecordKey startKey, RecordKey endKey)
+    {
+        if (!accounts.ContainsKey(startKey.AccountId))
+            return null;
+
+        var allRecords = accounts[startKey.AccountId].List();
+        if (allRecords == null)
+            return null;
+
+        List<Record> result = new List<Record>();
+        foreach (var record in allRecords)
+        {
+            // Inclusive range: startKey <= record.Key <= endKey
+            if (record.Key.CompareTo(startKey) >= 0 && record.Key.CompareTo(endKey) <= 0)
+            {
+                result.Add(record);
+            }
+        }
+        return result;
+    }
+
     public decimal GetBalance(string accountId, RecordKey key)
     {
         if (accounts.ContainsKey(accountId))
