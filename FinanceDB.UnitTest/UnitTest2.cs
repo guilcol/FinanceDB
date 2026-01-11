@@ -66,7 +66,7 @@ public class UnitTest2
         IReadOnlyList<Record>? hawkRecords = db.List("Hawk");
         
         Random rand = new Random();
-
+        
         // Pick out one random record from each accountId
         Record randomFalconRecord = falconRecords[rand.Next(falconRecords.Count-1)];
         Record randomEagleRecord = eagleRecords[rand.Next(eagleRecords.Count-1)];

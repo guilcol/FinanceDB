@@ -40,6 +40,9 @@ public class ParseCommand
             case "balance":
                 ShowBalance(parsedInput.Length > 1 ? parsedInput[1].Trim() : null);
                 break;
+            case "file_import":
+                ExecuteFileImport(parsedInput);
+                break;
             case "save":
                 _database.Save();
                 Console.WriteLine("Database saved.");
@@ -257,6 +260,58 @@ public class ParseCommand
         Console.WriteLine($"Total: {records.Count} record(s)");
     }
 
+    private void ExecuteFileImport(string[] parsedInput)
+    {
+        if (parsedInput.Length < 2)
+        {
+            Console.WriteLine("Usage: file_import <accountId> <file_path>");
+            return;
+        }
+
+        // Pattern: accountId filepath (filepath may contain spaces if quoted)
+        string pattern = @"^(\S+)\s+(.+)$";
+        Match match = Regex.Match(parsedInput[1], pattern);
+
+        if (!match.Success)
+        {
+            Console.WriteLine("Invalid syntax. Usage: file_import <accountId> <file_path>");
+            return;
+        }
+
+        string accountId = match.Groups[1].Value;
+        string filePath = match.Groups[2].Value.Trim().Trim('"');
+
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"File not found: {filePath}");
+            return;
+        }
+
+        try
+        {
+            string content = File.ReadAllText(filePath);
+            var parser = new QfxParser();
+            parser.Parse(content, accountId);
+
+            int imported = 0;
+            foreach (var record in parser.Transactions)
+            {
+                // Adjust key to handle same-day transactions
+                var adjustedKey = _database.AdjustKey(record.Key);
+                var adjustedRecord = new Record(adjustedKey, record.Description, record.Amount);
+
+                if (_database.Insert(adjustedRecord))
+                    imported++;
+            }
+
+            Console.WriteLine($"Imported {imported} transaction(s) into account '{accountId}'.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error importing file: {ex.Message}");
+        }
+    }
+
     private Record ParseRecord(string tokens)
     {
         // Pattern with datetime: accountId datetime "description" amount
@@ -346,6 +401,7 @@ public class ParseCommand
         Console.WriteLine("  list <accountId>");
         Console.WriteLine("  list_range <accountId> from <start_datetime> <start_sequence> to <end_datetime> <end_sequence>");
         Console.WriteLine("  balance <accountId>");
+        Console.WriteLine("  file_import <accountId> <file_path>");
         Console.WriteLine("  save");
         Console.WriteLine("  exit");
         Console.WriteLine();
@@ -357,5 +413,6 @@ public class ParseCommand
         Console.WriteLine("  update checking 2024-01-15T10:30:00Z 0 description='New desc' amount=15.00");
         Console.WriteLine("  delete_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999");
         Console.WriteLine("  list_range checking from 2024-01-01T00:00:00Z 0 to 2024-01-31T23:59:59Z 999");
+        Console.WriteLine("  file_import chase-cc C:\\Downloads\\statement.qfx");
     }
 }
