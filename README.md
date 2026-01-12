@@ -1,16 +1,24 @@
 # FinanceDB
 
-A small database for tracking financial transactions. It stores records organized by account using a B-tree structure.
+A personal finance database built from scratch. It uses a custom B-tree implementation to store and query financial transactions efficiently.
+
+## What it does
+
+- Stores transactions with date, description, and amount
+- Organizes data by account (checking, savings, credit cards, etc.)
+- Calculates running balances at any point in time
+- Imports bank statements from QFX/OFX files
+- Persists data as JSON files on disk
 
 ## Architecture
 
-The project is split into three parts:
+The system runs as a client-server application:
 
-- **FinanceDB.Server** - HTTP server that hosts the B-tree database
-- **FinanceDB.Cli** - Command-line client that talks to the server
-- **FinanceDB.Core** - Shared library with models and storage logic
+- **FinanceDB.Server** - HTTP server hosting the B-tree database. Handles concurrent requests with per-account locking.
+- **FinanceDB.Cli** - Command-line client. Parses commands and sends HTTP requests to the server.
+- **FinanceDB.Core** - Shared library containing the B-tree implementation, storage logic, and data models.
 
-The CLI does not access the database directly. All operations go through HTTP requests to the server.
+The CLI does not access the database directly. All operations go through HTTP requests to the server. This separation allows multiple clients to connect to the same database and prepares the architecture for future authentication and multi-user support.
 
 ## How to run
 
