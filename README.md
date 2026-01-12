@@ -86,4 +86,16 @@ Each record has a key with three fields:
 - **Date** - when the transaction happened
 - **Sequence** - distinguishes multiple records on the same date
 
-Records are stored in B-trees (one per account). Each node is saved as a JSON file in `Nodes/<accountId>/`.
+Records are stored in B-trees (one per account):
+
+```
+                    [Root Node]
+                   /     |     \
+            [Node A]  [Node B]  [Node C]
+            /    \       |        /   \
+        [Leaf] [Leaf] [Leaf]  [Leaf] [Leaf]
+```
+
+- **Leaf nodes** hold the actual records
+- **Internal nodes** hold references to child nodes with key ranges and subtree balances
+- Each node is saved as a JSON file in `Nodes/<accountId>/`
