@@ -17,7 +17,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\FinanceDB\FinanceDB.csproj" />
+      <ProjectReference Include="..\FinanceDB.Core\FinanceDB.Core.csproj" />
     </ItemGroup>
 
 </Project>

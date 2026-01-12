@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices.ComTypes;
+using FinanceDB.Core.Interfaces;
+using FinanceDB.Core.Models;
+using FinanceDB.Core.Storage;
 
 namespace FinanceDB.UnitTest;
 
