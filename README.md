@@ -1,6 +1,6 @@
 # FinanceDB
 
-A personal finance database built from scratch. It uses a custom B-tree implementation to store and query financial transactions efficiently.
+FinanceDB is a personal finance ledger and projection engine built from scratch. It uses a custom, time-indexed B-tree with aggregated balances to efficiently store, query, and validate financial transactions across past, present, and future. The system is designed not only to report historical balances, but to reason about future transactions, detect insufficient funds or stock at any point in time, and support scalable range queries without scanning individual records.
 
 ## What it does
 
